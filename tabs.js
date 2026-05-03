@@ -189,7 +189,7 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
             <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
               {STAT_META.map(s => (
                 <div key={s.key} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <span style={{ color:s.color, width:32, fontSize:10, fontFamily:"var(--font-title)", fontWeight:700 }}>{s.key}</span>
+                  <span style={{ color:s.color, width:80, fontSize:10, fontFamily:"var(--font-title)", fontWeight:700 }}>{s.label}</span>
                   <span style={{ color:"var(--text-mid)", width:26, fontSize:11, fontFamily:"var(--font-mono)", textAlign:"right" }}>{profile.stats[s.key]}</span>
                   <div style={{ flex:1, height:4, background:"rgba(255,255,255,0.05)", borderRadius:2, overflow:"hidden" }}>
                     <div style={{ height:"100%", width:`${(profile.stats[s.key]/100)*100}%`, background:s.color, borderRadius:2 }} />
@@ -218,7 +218,7 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
             <div style={{ display:"flex", flexDirection:"column", gap:7, opacity:0.4, pointerEvents:"none" }}>
               {STAT_META.map(s => (
                 <div key={s.key} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <span style={{ color:s.color, width:32, fontSize:10, fontFamily:"var(--font-title)", fontWeight:700 }}>{s.key}</span>
+                  <span style={{ color:s.color, width:80, fontSize:10, fontFamily:"var(--font-title)", fontWeight:700 }}>{s.label}</span>
                   <span style={{ color:"var(--text-mid)", width:26, fontSize:11, fontFamily:"var(--font-mono)", textAlign:"right" }}>{profile.stats[s.key]}</span>
                   <div style={{ flex:1, height:4, background:"rgba(255,255,255,0.05)", borderRadius:2, overflow:"hidden" }}>
                     <div style={{ height:"100%", width:`${(profile.stats[s.key]/100)*100}%`, background:s.color, borderRadius:2 }} />
@@ -244,12 +244,12 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
           padding:20, display:"flex", flexDirection:"column", alignItems:"center" }}>
           <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:12 }}>VISÃO GERAL DOS ATRIBUTOS</div>
           <StatRadar stats={statValues} />
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"6px 16px", marginTop:12, width:"100%" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px 12px", marginTop:12, width:"100%" }}>
             {STAT_META.map(s => (
               <div key={s.key} style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <div style={{ width:6, height:6, borderRadius:1, background:s.color, boxShadow:`0 0 4px ${s.color}` }} />
-                <span style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-mono)" }}>{s.key}: </span>
+                <div style={{ width:6, height:6, borderRadius:1, flexShrink:0, background:s.color, boxShadow:`0 0 4px ${s.color}` }} />
                 <span style={{ color:s.color, fontSize:10, fontFamily:"var(--font-mono)", fontWeight:700 }}>{profile.stats[s.key]}</span>
+                <span style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-body)" }}>{s.label}</span>
               </div>
             ))}
           </div>
