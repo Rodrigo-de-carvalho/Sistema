@@ -263,6 +263,8 @@ function App() {
   const weeklyProgress = useMemo(() => getWeeklyProgress(questLog), [questLog]);
   const xpLost         = useMemo(() => getPremiumXPLost(questLog),  [questLog]);
 
+  const isMobile = useIsMobile();
+
   // ── Renders de estado ────────────────────────────────────────
   if (loading) return (
     <div style={{ position:"fixed", inset:0, display:"flex", alignItems:"center",
@@ -305,8 +307,8 @@ function App() {
       {showPremium && <PremiumModal profile={profile} questLog={questLog} onClose={() => setShowPremium(false)} />}
 
       {/* Alertas */}
-      <div style={{ position:"fixed", top:70, right:20, zIndex:9999,
-        display:"flex", flexDirection:"column", gap:8 }}>
+      <div style={{ position:"fixed", top: isMobile?50:70, right: isMobile?8:20, zIndex:9999,
+        display:"flex", flexDirection:"column", gap:8, maxWidth: isMobile?"calc(100vw - 16px)":360 }}>
         {alerts.map(a => (
           <Alert key={a.id} message={a.msg} sub={a.sub} type={a.type}
             onClose={() => setAlerts(x => x.filter(i => i.id !== a.id))} />
@@ -316,8 +318,8 @@ function App() {
       <div style={{ position:"relative", zIndex:1, height:"100%", display:"flex", flexDirection:"column" }}>
 
         {/* Top bar */}
-        <div style={{ height:52, background:"rgba(5,5,15,0.95)", borderBottom:"1px solid var(--border-dim)",
-          display:"flex", alignItems:"center", padding:"0 24px",
+        <div style={{ height:isMobile?44:52, background:"rgba(5,5,15,0.95)", borderBottom:"1px solid var(--border-dim)",
+          display:"flex", alignItems:"center", padding: isMobile?"0 12px":"0 24px",
           backdropFilter:"blur(8px)", flexShrink:0 }}>
 
           {/* Logo */}
@@ -331,35 +333,44 @@ function App() {
               color:"var(--text-bright)", letterSpacing:2, animation:"flicker 15s ease infinite" }}>SISTEMA</div>
           </div>
 
-          {/* Abas */}
-          <div style={{ display:"flex", gap:2, flex:1 }}>
-            {TABS_CFG.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                display:"flex", alignItems:"center", gap:7,
-                background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
-                border:"none", borderBottom:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
-                color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
-                padding:"0 16px", height:52, cursor:"pointer",
-                fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1, transition:"all 0.15s",
-              }}>
-                <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {/* Abas — desktop only */}
+          {!isMobile && (
+            <div style={{ display:"flex", gap:2, flex:1 }}>
+              {TABS_CFG.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)} style={{
+                  display:"flex", alignItems:"center", gap:7,
+                  background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
+                  border:"none", borderBottom:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                  color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
+                  padding:"0 16px", height:52, cursor:"pointer",
+                  fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
+                  transition:"background 0.15s, color 0.15s",
+                  WebkitTapHighlightColor:"transparent",
+                }}>
+                  <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {isMobile && <div style={{ flex:1 }} />}
 
           {/* Direita: relógio, alertas, rank, logout */}
-          <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-            <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)" }}>{clock}</div>
+          <div style={{ display:"flex", alignItems:"center", gap: isMobile?10:16 }}>
+            {!isMobile && (
+              <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)" }}>{clock}</div>
+            )}
 
             {/* Indicador online/offline */}
             <div style={{ display:"flex", alignItems:"center", gap:5 }}>
               <div style={{ width:6, height:6, borderRadius:"50%",
                 background: isOnline?"var(--green-core)":"var(--red-core)",
                 boxShadow: isOnline?"0 0 6px var(--green-core)":"0 0 6px var(--red-core)" }} />
-              <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
-                {isOnline?"SYNC":"OFFLINE"}
-              </span>
+              {!isMobile && (
+                <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
+                  {isOnline?"SYNC":"OFFLINE"}
+                </span>
+              )}
             </div>
 
             {/* Alertas */}
@@ -378,49 +389,75 @@ function App() {
               <button onClick={() => setShowPremium(true)} style={{ background:"linear-gradient(90deg,rgba(255,215,0,0.12),rgba(155,93,229,0.12))",
                 border:"1px solid rgba(255,215,0,0.35)", color:"var(--gold-core)",
                 padding:"4px 10px", borderRadius:3, cursor:"pointer",
-                fontFamily:"var(--font-title)", fontSize:10, letterSpacing:1 }}>
-                ⚜ PREMIUM
+                fontFamily:"var(--font-title)", fontSize:10, letterSpacing:1,
+                WebkitTapHighlightColor:"transparent" }}>
+                ⚜ {isMobile?"":"PREMIUM"}
               </button>
             )}
 
             {/* Rank */}
-            <div style={{ background:"rgba(155,93,229,0.12)", border:"1px solid rgba(155,93,229,0.35)",
-              color: RANK_COLORS[dispRank], padding:"4px 12px", borderRadius:3,
-              fontFamily:"var(--font-title)", fontSize:11, fontWeight:700, letterSpacing:1,
-              animation:"rank-glow 3s ease infinite" }}>RANK {dispRank}</div>
+            {!isMobile && (
+              <div style={{ background:"rgba(155,93,229,0.12)", border:"1px solid rgba(155,93,229,0.35)",
+                color: RANK_COLORS[dispRank], padding:"4px 12px", borderRadius:3,
+                fontFamily:"var(--font-title)", fontSize:11, fontWeight:700, letterSpacing:1,
+                animation:"rank-glow 3s ease infinite" }}>RANK {dispRank}</div>
+            )}
 
             {/* Logout */}
             <button onClick={handleLogout} title="Sair"
               style={{ background:"none", border:"none", color:"var(--text-dim)",
-                cursor:"pointer", padding:4, display:"flex", alignItems:"center" }}>
+                cursor:"pointer", padding:4, display:"flex", alignItems:"center",
+                WebkitTapHighlightColor:"transparent" }}>
               <Icon name="log-out" size={15} />
             </button>
           </div>
         </div>
 
         {/* Conteúdo */}
-        <div style={{ flex:1, overflow:"auto", padding:20 }}>
+        <div style={{ flex:1, overflow:"auto", padding: isMobile ? "12px 12px 72px" : 20 }}>
           {tabContent[tab]}
         </div>
 
-        {/* Bottom bar */}
-        <div style={{ height:28, background:"rgba(3,3,12,0.98)", borderTop:"1px solid var(--border-dim)",
-          display:"flex", alignItems:"center", padding:"0 20px", gap:24, flexShrink:0 }}>
-          <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:1 }}>SISTEMA v2.0.0</span>
-          <span style={{ color: isOnline?"rgba(0,255,136,0.7)":"rgba(255,68,102,0.7)", fontSize:9, fontFamily:"var(--font-mono)" }}>
-            ● {isOnline?"ONLINE":"OFFLINE"}
-          </span>
-          <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
-            CAÇADOR: {profile.name.toUpperCase()}
-          </span>
-          <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
-            LV.{profile.level}
-          </span>
-          <span style={{ flex:1 }} />
-          <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
-            🔥 STREAK: {profile.streak} DIAS
-          </span>
-        </div>
+        {/* Bottom bar — desktop */}
+        {!isMobile && (
+          <div style={{ height:28, background:"rgba(3,3,12,0.98)", borderTop:"1px solid var(--border-dim)",
+            display:"flex", alignItems:"center", padding:"0 20px", gap:24, flexShrink:0 }}>
+            <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:1 }}>SISTEMA v2.0.0</span>
+            <span style={{ color: isOnline?"rgba(0,255,136,0.7)":"rgba(255,68,102,0.7)", fontSize:9, fontFamily:"var(--font-mono)" }}>
+              ● {isOnline?"ONLINE":"OFFLINE"}
+            </span>
+            <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
+              CAÇADOR: {profile.name.toUpperCase()}
+            </span>
+            <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>LV.{profile.level}</span>
+            <span style={{ flex:1 }} />
+            <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
+              🔥 STREAK: {profile.streak} DIAS
+            </span>
+          </div>
+        )}
+
+        {/* Bottom nav — mobile */}
+        {isMobile && (
+          <div style={{ position:"fixed", bottom:0, left:0, right:0, height:58,
+            background:"rgba(3,3,12,0.97)", borderTop:"1px solid var(--border-dim)",
+            display:"flex", zIndex:200, backdropFilter:"blur(8px)" }}>
+            {TABS_CFG.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                flex:1, height:"100%", background:"transparent", border:"none",
+                borderTop:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
+                cursor:"pointer", display:"flex", flexDirection:"column",
+                alignItems:"center", justifyContent:"center", gap:3,
+                transition:"background 0.15s, color 0.15s",
+                WebkitTapHighlightColor:"transparent",
+              }}>
+                <Icon name={t.icon} size={18} color={tab===t.id?"var(--blue-core)":undefined} />
+                <span style={{ fontFamily:"var(--font-title)", fontSize:8, letterSpacing:1 }}>{t.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

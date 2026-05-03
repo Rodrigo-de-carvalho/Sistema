@@ -1,5 +1,15 @@
 // ── ui.js — componentes visuais compartilhados ───────────────────
 
+function useIsMobile() {
+  const [mobile, setMobile] = React.useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 768);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+  return mobile;
+}
+
 const ICON_PATHS = {
   "ghost":            "M9 2a7 7 0 0 0-7 7v8l3-3 2 2 2-2 2 2 2-2 3 3V9a7 7 0 0 0-7-7zm-2 9a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm4 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z",
   "activity":         "M22 12h-4l-3 9L9 3l-3 9H2",

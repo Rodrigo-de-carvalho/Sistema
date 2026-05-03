@@ -2,6 +2,7 @@
 
 // ── STATUS ────────────────────────────────────────────────────────
 function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgress, countdown, isPremium, xpLost, onShowPremium }) {
+  const isMobile = useIsMobile();
   const { level, xpInLevel, xpToNext } = computeLevel(profile.xp);
   const rank     = getRankForLevel(level);
   const dispRank = FREE_RANKS.includes(rank) ? rank : "C";
@@ -17,7 +18,7 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
   });
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
 
       {/* ESQUERDA */}
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -239,12 +240,13 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
 
 // ── HABILIDADES ───────────────────────────────────────────────────
 function SkillsTab({ profile }) {
+  const isMobile = useIsMobile();
   const [selected, setSelected] = React.useState(null);
   const rankColors = { EX:"#ff66dd", S:"#ffd700", A:"#ffd700", B:"#9b5de5", C:"#4f8cff", D:"#00ff88", E:"#8899cc" };
   const unlockedIds = new Set(SKILLS.filter(s => profile.achievements.includes(s.unlockBy)).map(s => s.id));
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:4 }}>HABILIDADES</div>
         {SKILLS.map(sk => {
@@ -526,6 +528,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
 
 // ── INVENTÁRIO ────────────────────────────────────────────────────
 function InventoryTab({ profile }) {
+  const isMobile = useIsMobile();
   const [selected, setSelected] = React.useState(null);
   const [filter, setFilter]     = React.useState("Todos");
   const owned   = new Set(profile.inventory_items || []);
@@ -534,7 +537,7 @@ function InventoryTab({ profile }) {
   const typeIcon = { "Insígnia":"star","Moldura":"user","Título":"crown","Tema":"moon" };
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
       <div>
         <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
           {types.map(t => (
