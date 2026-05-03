@@ -1,8 +1,11 @@
 // ── tabs.js — as 5 abas do app ────────────────────────────────────
 
 // ── STATUS ────────────────────────────────────────────────────────
-function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgress, countdown, isPremium, xpLost, onShowPremium }) {
+function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgress, countdown, isPremium, xpLost, onShowPremium, onNameEdit }) {
   const isMobile = useIsMobile();
+  const [editingName, setEditingName] = React.useState(false);
+  const [nameInput,   setNameInput]   = React.useState(profile.name);
+  const nameRef = React.useRef();
   const { level, xpInLevel, xpToNext } = computeLevel(profile.xp);
   const rank     = getRankForLevel(level);
   const dispRank = FREE_RANKS.includes(rank) ? rank : "C";
@@ -39,8 +42,33 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
             </div>
             <div>
               <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:2, fontFamily:"var(--font-mono)", marginBottom:3 }}>CAÇADOR</div>
-              <div style={{ color:"var(--text-bright)", fontSize:18, fontFamily:"var(--font-title)", fontWeight:700,
-                letterSpacing:1, animation:"flicker 12s ease infinite" }}>{profile.name}</div>
+              {editingName ? (
+                <input ref={nameRef} value={nameInput}
+                  onChange={e => setNameInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") { onNameEdit(nameInput); setEditingName(false); }
+                    if (e.key === "Escape") { setNameInput(profile.name); setEditingName(false); }
+                  }}
+                  onBlur={() => { onNameEdit(nameInput); setEditingName(false); }}
+                  maxLength={24}
+                  style={{ background:"rgba(255,255,255,0.06)", border:"1px solid var(--blue-core)",
+                    color:"var(--text-bright)", fontFamily:"var(--font-title)", fontSize:16,
+                    fontWeight:700, letterSpacing:1, borderRadius:3, padding:"2px 8px",
+                    outline:"none", width:"100%" }}
+                  autoFocus />
+              ) : (
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ color:"var(--text-bright)", fontSize:18, fontFamily:"var(--font-title)", fontWeight:700,
+                    letterSpacing:1, animation:"flicker 12s ease infinite" }}>{profile.name}</div>
+                  <button onClick={() => { setNameInput(profile.name); setEditingName(true); }}
+                    style={{ background:"none", border:"none", padding:2, cursor:"pointer",
+                      display:"flex", alignItems:"center", opacity:0.5,
+                      WebkitTapHighlightColor:"transparent" }}
+                    title="Editar nome">
+                    <Icon name="edit" size={12} color="var(--text-dim)" />
+                  </button>
+                </div>
+              )}
               <div style={{ display:"flex", gap:8, alignItems:"center", marginTop:5, flexWrap:"wrap" }}>
                 {profile.titles[0] && (
                   <span style={{ background:"rgba(155,93,229,0.15)", border:"1px solid rgba(155,93,229,0.4)",

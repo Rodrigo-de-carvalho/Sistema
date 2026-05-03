@@ -11,6 +11,7 @@ function useIsMobile() {
 }
 
 const ICON_PATHS = {
+  "edit":             "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
   "ghost":            "M9 2a7 7 0 0 0-7 7v8l3-3 2 2 2-2 2 2 2-2 3 3V9a7 7 0 0 0-7-7zm-2 9a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm4 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z",
   "activity":         "M22 12h-4l-3 9L9 3l-3 9H2",
   "archive":          "M21 8v13H3V8M1 3h22v5H1zM10 12h4",

@@ -21,8 +21,9 @@ function App() {
   const [clock,      setClock]      = useState("");
   const [countdown,  setCountdown]  = useState("");
   const [isOnline,   setIsOnline]   = useState(navigator.onLine);
-  const [showPremium,setShowPremium]= useState(false);
-  const [syncTimer,  setSyncTimer]  = useState(null);
+  const [showPremium,     setShowPremium]      = useState(false);
+  const [syncTimer,       setSyncTimer]        = useState(null);
+  const [showPassReset,   setShowPassReset]    = useState(false);
 
   // ── Relógio + countdown ──────────────────────────────────────
   useEffect(() => {
@@ -89,6 +90,8 @@ function App() {
           if (event === "SIGNED_OUT") {
             setProfile(null); setQuestLog({});
             setShowAuth(true);
+          } else if (event === "PASSWORD_RECOVERY") {
+            setShowPassReset(true);
           }
         });
       } else if (!cached) {
@@ -217,6 +220,13 @@ function App() {
     });
   }, []);
 
+  // ── Editar nome ─────────────────────────────────────────────
+  const handleNameEdit = useCallback((newName) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === profile?.name) return;
+    applyProfileUpdate({ name: trimmed });
+  }, [profile?.name]);
+
   // ── Editar avatar ────────────────────────────────────────────
   const handleAvatarEdit = useCallback((e) => {
     const file = e.target.files[0];
@@ -283,8 +293,8 @@ function App() {
   );
 
   if (showAuth && window.SUPABASE_OK) return <AuthScreen onAuth={handleAuth} />;
-  if (needsSetup) return <ProfileSetup onSave={handleProfileSave} />;
-  if (!profile)   return <ProfileSetup onSave={handleProfileSave} />;
+  if (needsSetup) return <ProfileSetup onSave={handleProfileSave} session={session} />;
+  if (!profile)   return <ProfileSetup onSave={handleProfileSave} session={session} />;
 
   const dispRank = FREE_RANKS.includes(getRankForLevel(profile.level))
     ? getRankForLevel(profile.level) : "C";
@@ -293,7 +303,8 @@ function App() {
     status:       <StatusTab      profile={profile} questLog={questLog} onAvatarEdit={handleAvatarEdit}
                                   onStatPoint={handleStatPoint} weeklyProgress={weeklyProgress} countdown={countdown}
                                   isPremium={!!profile.is_premium} xpLost={xpLost}
-                                  onShowPremium={() => setShowPremium(true)} />,
+                                  onShowPremium={() => setShowPremium(true)}
+                                  onNameEdit={handleNameEdit} />,
     skills:       <SkillsTab      profile={profile} />,
     quests:       <QuestsTab      questLog={questLog} onTaskToggle={handleTaskToggle} countdown={countdown}
                                   isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)} />,
@@ -307,6 +318,9 @@ function App() {
 
       {/* Premium modal */}
       {showPremium && <PremiumModal profile={profile} questLog={questLog} onClose={() => setShowPremium(false)} />}
+
+      {/* Reset de senha */}
+      {showPassReset && <PasswordResetModal onClose={() => setShowPassReset(false)} />}
 
       {/* Alertas */}
       <div style={{ position:"fixed", top: isMobile?50:70, right: isMobile?8:20, zIndex:9999,
