@@ -169,3 +169,64 @@ function pruneQuestLog(questLog) {
   if (keys.length <= 30) return questLog;
   return Object.fromEntries(keys.slice(-30).map(k => [k, questLog[k]]));
 }
+
+// ── Freemium helpers ─────────────────────────────────────────────
+
+// XP ganho neste mês (para calcular o bônus perdido)
+function getMonthXP(questLog) {
+  const month = new Date().toISOString().slice(0, 7);
+  return Object.entries(questLog)
+    .filter(([date]) => date.startsWith(month))
+    .reduce((sum, [, dayLog]) => {
+      return sum + Object.values(dayLog).reduce((s, qLog) => {
+        return s + Object.entries(qLog)
+          .filter(([, done]) => done)
+          .reduce((s2, [taskId]) => {
+            const task = DAILY_QUESTS.flatMap(q => q.tasks).find(t => t.id === taskId);
+            return s2 + (task ? task.xp : 0);
+          }, 0);
+      }, 0);
+    }, 0);
+}
+
+// XP que o usuário teria ganho a mais se fosse Premium
+function getPremiumXPLost(questLog) {
+  return Math.floor(getMonthXP(questLog) * PREMIUM_XP_BONUS);
+}
+
+// Reseta escudos se for um novo mês
+function resetShieldsIfNewMonth(profile) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  if (profile.shields_month === currentMonth) return profile;
+  return {
+    ...profile,
+    streak_shields: profile.is_premium ? SHIELDS_PREMIUM : SHIELDS_FREE,
+    shields_month:  currentMonth,
+  };
+}
+
+// Verifica se precisa consumir escudo de streak (chamado no carregamento do app)
+function checkStreakShield(profile) {
+  const today     = todayKey();
+  const yesterday = yesterdayKey();
+  if (!profile.last_active) return { profile, shieldUsed: false };
+  if (profile.last_active === today || profile.last_active === yesterday) return { profile, shieldUsed: false };
+
+  // Streak quebrou — tem escudo?
+  if (profile.streak_shields > 0 && profile.streak > 0) {
+    return {
+      profile: { ...profile, streak_shields: profile.streak_shields - 1, last_active: yesterday },
+      shieldUsed: true,
+    };
+  }
+  // Sem escudo — reset streak
+  return { profile: { ...profile, streak: 0 }, shieldUsed: false };
+}
+
+// Semana atual (segunda-feira)
+function currentWeekKey() {
+  const d   = new Date();
+  const day = d.getDay() || 7; // 1=Mon … 7=Sun
+  d.setDate(d.getDate() - (day - 1));
+  return d.toISOString().slice(0, 10);
+}

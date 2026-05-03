@@ -1,7 +1,7 @@
 // ── tabs.js — as 5 abas do app ────────────────────────────────────
 
 // ── STATUS ────────────────────────────────────────────────────────
-function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgress, countdown }) {
+function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgress, countdown, isPremium, xpLost, onShowPremium }) {
   const { level, xpInLevel, xpToNext } = computeLevel(profile.xp);
   const rank     = getRankForLevel(level);
   const dispRank = FREE_RANKS.includes(rank) ? rank : "C";
@@ -109,10 +109,43 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
               </div>
             ))}
           </div>
-          <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", marginTop:6, textAlign:"center" }}>
-            últimos 7 dias · reset em {countdown}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
+            <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
+              últimos 7 dias · reset em {countdown}
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:3 }}>
+              {Array.from({ length: isPremium ? SHIELDS_PREMIUM : SHIELDS_FREE }).map((_, i) => (
+                <span key={i} style={{ fontSize:12, opacity: i < (profile.streak_shields || 0) ? 1 : 0.2 }}>🛡</span>
+              ))}
+              <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", marginLeft:3 }}>
+                {profile.streak_shields || 0}/{isPremium ? SHIELDS_PREMIUM : SHIELDS_FREE}
+              </span>
+            </div>
           </div>
         </div>
+
+        {/* XP perdido sem Premium */}
+        {!isPremium && xpLost > 0 && (
+          <div onClick={onShowPremium} style={{ cursor:"pointer", background:"rgba(255,68,102,0.06)",
+            border:"1px solid rgba(255,68,102,0.25)", borderRadius:6, padding:"14px 16px",
+            display:"flex", alignItems:"center", gap:12 }}
+            onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(255,68,102,0.5)"}
+            onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(255,68,102,0.25)"}>
+            <span style={{ fontSize:20, flexShrink:0 }}>😔</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:2, marginBottom:3 }}>
+                XP PERDIDO SEM PREMIUM (MÊS)
+              </div>
+              <div style={{ color:"var(--red-core)", fontSize:20, fontFamily:"var(--font-title)", fontWeight:900,
+                textShadow:"0 0 12px rgba(255,68,102,0.4)" }}>
+                -{xpLost.toLocaleString()} XP
+              </div>
+            </div>
+            <span style={{ color:"var(--gold-core)", fontSize:9, fontFamily:"var(--font-title)", letterSpacing:1, flexShrink:0 }}>
+              ⚜ VER
+            </span>
+          </div>
+        )}
 
         {/* Pontos de atributo */}
         {profile.stat_points > 0 && (
@@ -305,7 +338,7 @@ function SkillsTab({ profile }) {
 }
 
 // ── MISSÕES ───────────────────────────────────────────────────────
-function QuestsTab({ questLog, onTaskToggle, countdown }) {
+function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium }) {
   const [filter, setFilter] = React.useState("Todas");
   const today    = todayKey();
   const catColors = { "Força":"#ff6644","Agilidade":"#00d4ff","Inteligência":"#9b5de5","Vitalidade":"#ff4466","Percepção":"#ffd700" };
@@ -427,6 +460,66 @@ function QuestsTab({ questLog, onTaskToggle, countdown }) {
           );
         })}
       </div>
+
+      {/* ── Missões Semanais ── */}
+      <div style={{ marginTop:24 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14, paddingBottom:10,
+          borderBottom:"1px solid var(--border-dim)" }}>
+          <Icon name="star" size={14} color="var(--purple-glow)" />
+          <span style={{ color:"var(--purple-glow)", fontSize:11, fontFamily:"var(--font-title)", letterSpacing:2 }}>
+            MISSÕES SEMANAIS
+          </span>
+          {!isPremium && (
+            <span style={{ background:"rgba(255,215,0,0.1)", border:"1px solid rgba(255,215,0,0.3)",
+              color:"var(--gold-core)", fontSize:9, padding:"2px 8px", fontFamily:"var(--font-title)", borderRadius:2 }}>
+              ⚜ PREMIUM
+            </span>
+          )}
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
+          {WEEKLY_QUESTS.map(q => (
+            <div key={q.id} style={{ position:"relative", borderRadius:6, overflow:"hidden",
+              background:"rgba(10,10,26,0.6)", border:"1px solid rgba(155,93,229,0.2)" }}>
+              <div style={{ padding:16, filter: isPremium?"none":"blur(1.5px)" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                  <div>
+                    <span style={{ background:"rgba(155,93,229,0.15)", border:"1px solid rgba(155,93,229,0.35)",
+                      color:"var(--purple-glow)", fontSize:9, padding:"2px 8px", fontFamily:"var(--font-title)",
+                      letterSpacing:1, borderRadius:2, display:"inline-block", marginBottom:8 }}>{q.category}</span>
+                    <div style={{ color:"var(--text-bright)", fontSize:14, fontFamily:"var(--font-title)", fontWeight:600 }}>{q.title}</div>
+                  </div>
+                  <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
+                    <div style={{ color:"var(--purple-glow)", fontSize:11, fontFamily:"var(--font-mono)" }}>
+                      +{q.tasks.reduce((s,t)=>s+t.xp,0)+q.bonusXP} XP
+                    </div>
+                    <div style={{ color:"var(--gold-core)", fontSize:10, fontFamily:"var(--font-mono)" }}>+{q.gold} G</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {q.tasks.map(t => (
+                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:8,
+                      color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-body)" }}>
+                      <div style={{ width:14, height:14, borderRadius:2, flexShrink:0,
+                        border:"1px solid rgba(155,93,229,0.3)" }} />
+                      {t.label}
+                      <span style={{ marginLeft:"auto", color:"var(--purple-glow)", fontSize:10,
+                        fontFamily:"var(--font-mono)", flexShrink:0 }}>+{t.xp}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {!isPremium && (
+                <div style={{ position:"absolute", inset:0, background:"rgba(2,2,10,0.65)",
+                  display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column",
+                  gap:8, cursor:"pointer" }} onClick={onShowPremium}>
+                  <Icon name="lock" size={22} color="rgba(155,93,229,0.7)" />
+                  <span style={{ color:"var(--gold-core)", fontSize:10, fontFamily:"var(--font-title)", letterSpacing:2 }}>⚜ PREMIUM</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -540,9 +633,9 @@ function AchievementsTab({ profile }) {
   const [filter, setFilter] = React.useState("Todas");
   const unlocked = new Set(profile.achievements || []);
   const filters  = ["Todas", "Obtidas", "Bloqueadas"];
-  const shown = filter === "Todas" ? ACHIEVEMENTS
-    : filter === "Obtidas"  ? ACHIEVEMENTS.filter(a =>  unlocked.has(a.id))
-    : ACHIEVEMENTS.filter(a => !unlocked.has(a.id));
+  const shown = filter === "Todas" ? ALL_ACHIEVEMENTS
+    : filter === "Obtidas"  ? ALL_ACHIEVEMENTS.filter(a =>  unlocked.has(a.id))
+    : ALL_ACHIEVEMENTS.filter(a => !unlocked.has(a.id));
 
   return (
     <div style={{ animation:"appear-up 0.4s ease" }}>
@@ -559,7 +652,7 @@ function AchievementsTab({ profile }) {
           ))}
         </div>
         <span style={{ color:"var(--text-mid)", fontSize:11, fontFamily:"var(--font-mono)" }}>
-          {unlocked.size} / {ACHIEVEMENTS.length}
+          {unlocked.size} / {ALL_ACHIEVEMENTS.length}
         </span>
       </div>
 
@@ -572,7 +665,7 @@ function AchievementsTab({ profile }) {
             {Math.round((unlocked.size/ACHIEVEMENTS.length)*100)}%
           </span>
         </div>
-        <Bar value={unlocked.size} max={ACHIEVEMENTS.length} color="var(--gold-core)" />
+        <Bar value={unlocked.size} max={ALL_ACHIEVEMENTS.length} color="var(--gold-core)" />
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:10 }}>
@@ -601,12 +694,19 @@ function AchievementsTab({ profile }) {
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
                   <div style={{ color: isUnlocked?"var(--text-bright)":"var(--text-dim)", fontSize:13,
                     fontFamily:"var(--font-title)", fontWeight:600 }}>{ach.name}</div>
-                  {isUnlocked && (
-                    <span style={{ background:`${gc}15`, border:`1px solid ${gc}33`, color:gc,
-                      fontSize:9, padding:"1px 7px", fontFamily:"var(--font-title)", borderRadius:2, flexShrink:0 }}>
-                      {ach.grade}
-                    </span>
-                  )}
+                  <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+                    {ach.premium && (
+                      <span style={{ background:"rgba(255,215,0,0.1)", border:"1px solid rgba(255,215,0,0.3)",
+                        color:"var(--gold-core)", fontSize:9, padding:"1px 6px",
+                        fontFamily:"var(--font-title)", borderRadius:2 }}>⚜</span>
+                    )}
+                    {isUnlocked && (
+                      <span style={{ background:`${gc}15`, border:`1px solid ${gc}33`, color:gc,
+                        fontSize:9, padding:"1px 7px", fontFamily:"var(--font-title)", borderRadius:2 }}>
+                        {ach.grade}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-body)", lineHeight:1.4, marginBottom:4 }}>
                   {ach.desc}

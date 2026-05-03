@@ -57,8 +57,11 @@ function App() {
       // 1. Carrega do localStorage
       const cached = loadProfile();
       if (cached) {
-        setProfile(cached);
-        setQuestLog(cached.quest_log || {});
+        let p = resetShieldsIfNewMonth(cached);
+        const { profile: p2, shieldUsed: su1 } = checkStreakShield(p);
+        setProfile(p2);
+        setQuestLog(p2.quest_log || {});
+        if (su1) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
       }
 
       // 2. Verifica sessão Supabase
@@ -68,9 +71,12 @@ function App() {
           setSession(sess);
           const remote = await loadFromSupabase(sess.user.id);
           if (remote) {
-            setProfile(remote);
-            setQuestLog(remote.quest_log || {});
-            saveProfile(remote);
+            let p = resetShieldsIfNewMonth(remote);
+            const { profile: p2, shieldUsed: su2 } = checkStreakShield(p);
+            setProfile(p2);
+            setQuestLog(p2.quest_log || {});
+            saveProfile(p2);
+            if (su2) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
           } else if (!cached) {
             setNeedsSetup(true);
           }
@@ -169,8 +175,9 @@ function App() {
       if (!prev) return prev;
       const isDone  = !!(prev.quest_log?.[today]?.[questId]?.[taskId]);
       const delta   = isDone ? -1 : 1;
+      const effectiveXP = (!isDone && prev.is_premium) ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP;
       const newStat = Math.max(10, (prev.stats[taskStat] || 10) + delta);
-      const newXP   = Math.max(0, prev.xp + delta * taskXP);
+      const newXP   = Math.max(0, prev.xp + delta * effectiveXP);
       const { level } = computeLevel(newXP);
 
       // Streak (só conta ao marcar, não desmarcar)
@@ -252,8 +259,9 @@ function App() {
     if (!window.SUPABASE_OK) setNeedsSetup(true);
   }, []);
 
-  // ── Weekly progress (memorizado) ─────────────────────────────
+  // ── Weekly progress + XP perdido sem premium (memorizados) ──
   const weeklyProgress = useMemo(() => getWeeklyProgress(questLog), [questLog]);
+  const xpLost         = useMemo(() => getPremiumXPLost(questLog),  [questLog]);
 
   // ── Renders de estado ────────────────────────────────────────
   if (loading) return (
@@ -279,9 +287,12 @@ function App() {
 
   const tabContent = {
     status:       <StatusTab      profile={profile} questLog={questLog} onAvatarEdit={handleAvatarEdit}
-                                  onStatPoint={handleStatPoint} weeklyProgress={weeklyProgress} countdown={countdown} />,
+                                  onStatPoint={handleStatPoint} weeklyProgress={weeklyProgress} countdown={countdown}
+                                  isPremium={!!profile.is_premium} xpLost={xpLost}
+                                  onShowPremium={() => setShowPremium(true)} />,
     skills:       <SkillsTab      profile={profile} />,
-    quests:       <QuestsTab      questLog={questLog} onTaskToggle={handleTaskToggle} countdown={countdown} />,
+    quests:       <QuestsTab      questLog={questLog} onTaskToggle={handleTaskToggle} countdown={countdown}
+                                  isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)} />,
     inventory:    <InventoryTab   profile={profile} />,
     achievements: <AchievementsTab profile={profile} />,
   };
@@ -290,8 +301,8 @@ function App() {
     <div style={{ width:"100%", height:"100%", position:"relative", overflow:"hidden" }}>
       <Background />
 
-      {/* Premium gate */}
-      {showPremium && <PremiumGate onClose={() => setShowPremium(false)} />}
+      {/* Premium modal */}
+      {showPremium && <PremiumModal profile={profile} questLog={questLog} onClose={() => setShowPremium(false)} />}
 
       {/* Alertas */}
       <div style={{ position:"fixed", top:70, right:20, zIndex:9999,
@@ -360,6 +371,16 @@ function App() {
                   display:"flex", alignItems:"center", justifyContent:"center",
                   fontFamily:"var(--font-mono)", fontWeight:700 }}>{alerts.length}</span>
               </div>
+            )}
+
+            {/* Botão Premium */}
+            {!profile.is_premium && (
+              <button onClick={() => setShowPremium(true)} style={{ background:"linear-gradient(90deg,rgba(255,215,0,0.12),rgba(155,93,229,0.12))",
+                border:"1px solid rgba(255,215,0,0.35)", color:"var(--gold-core)",
+                padding:"4px 10px", borderRadius:3, cursor:"pointer",
+                fontFamily:"var(--font-title)", fontSize:10, letterSpacing:1 }}>
+                ⚜ PREMIUM
+              </button>
             )}
 
             {/* Rank */}

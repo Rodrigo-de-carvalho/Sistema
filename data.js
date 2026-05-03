@@ -1,6 +1,10 @@
 // ── data.js — constantes e dados do jogo ─────────────────────────
 
-const FREE_RANKS = ["E", "D", "C"];
+// ── Freemium ──────────────────────────────────────────────────────
+const FREE_RANKS        = ["E", "D", "C"];
+const PREMIUM_XP_BONUS  = 0.25; // 25% a mais em todo XP
+const SHIELDS_FREE      = 1;    // escudos de streak por mês (free)
+const SHIELDS_PREMIUM   = 4;    // escudos de streak por mês (premium)
 
 const RANK_COLORS = {
   E: "#8899cc", D: "#00ff88", C: "#4f8cff",
@@ -126,6 +130,54 @@ const ACH_TO_ITEMS = INVENTORY_ITEMS
 const ACH_TO_SKILL = SKILLS
   .reduce((m, s) => ({ ...m, [s.unlockBy]: s.id }), {});
 
+// ── Missões semanais (Premium) ────────────────────────────────────
+const WEEKLY_QUESTS = [
+  {
+    id: "wk_warrior", title: "Semana do Guerreiro", category: "Força",
+    desc: "Um desafio semanal de resistência física total. Apenas para Caçadores determinados.",
+    icon: "zap", premium: true,
+    tasks: [
+      { id: "wk_500push",  label: "500 flexões na semana",     xp: 800,  stat: "FOR" },
+      { id: "wk_run25",    label: "Correr 25km na semana",     xp: 1000, stat: "AGI" },
+      { id: "wk_plank5",   label: "Prancha total de 5 min",    xp: 500,  stat: "VIT" },
+    ],
+    bonusXP: 700, gold: 1500,
+  },
+  {
+    id: "wk_scholar", title: "Semana do Estudioso", category: "Inteligência",
+    desc: "Maximize seu conhecimento. 7 dias de imersão total no aprendizado.",
+    icon: "book-open", premium: true,
+    tasks: [
+      { id: "wk_study7h",  label: "Estudar 7 horas na semana",      xp: 1000, stat: "INT" },
+      { id: "wk_chapter",  label: "Terminar 1 capítulo de livro",   xp: 500,  stat: "PER" },
+      { id: "wk_newskill", label: "Aprender 1 habilidade nova",     xp: 700,  stat: "INT" },
+    ],
+    bonusXP: 700, gold: 1500,
+  },
+  {
+    id: "wk_mindmaster", title: "Semana da Mente Mestra", category: "Percepção",
+    desc: "Domine seu estado mental. Foco absoluto por 7 dias.",
+    icon: "eye", premium: true,
+    tasks: [
+      { id: "wk_med7",     label: "Meditar 7 dias seguidos",       xp: 800,  stat: "PER" },
+      { id: "wk_journal7", label: "Diário por 7 dias seguidos",    xp: 500,  stat: "PER" },
+      { id: "wk_nophone7", label: "7 dias de 1h sem telas",        xp: 700,  stat: "RES" },
+    ],
+    bonusXP: 700, gold: 1500,
+  },
+];
+
+// ── Conquistas épicas/lendárias (Premium) ─────────────────────────
+const PREMIUM_ACHIEVEMENTS = [
+  { id: "prem_streak_60",  name: "Dois Meses Imparáveis", desc: "60 dias consecutivos de atividade.",   icon: "flame",       grade: "Épico",    xp: 5000,  premium: true },
+  { id: "prem_streak_100", name: "Centurião",             desc: "100 dias consecutivos.",               icon: "shield",      grade: "Lendário", xp: 10000, premium: true },
+  { id: "prem_level_20",   name: "Elite",                 desc: "Alcance o nível 20.",                  icon: "trending-up", grade: "Épico",    xp: 3000,  premium: true },
+  { id: "prem_all_weekly", name: "Semanas Perfeitas",     desc: "Complete 4 missões semanais.",         icon: "star",        grade: "Lendário", xp: 8000,  premium: true },
+  { id: "prem_badge",      name: "Caçador Premium",       desc: "Badge exclusivo de membro Premium.",   icon: "crown",       grade: "Mítico",   xp: 1000,  premium: true },
+];
+
+const ALL_ACHIEVEMENTS = [...ACHIEVEMENTS, ...PREMIUM_ACHIEVEMENTS];
+
 const DEFAULT_PROFILE = {
   name: "Caçador",
   avatar: null,
@@ -140,5 +192,9 @@ const DEFAULT_PROFILE = {
   achievements: [],
   inventory_items: ["badge_beginner"],
   quest_log: {},
+  weekly_log: {},
   premium_gate_shown: false,
+  is_premium: false,
+  streak_shields: SHIELDS_FREE,
+  shields_month: null,   // "YYYY-MM" — mês do último reset
 };
