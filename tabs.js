@@ -57,8 +57,8 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
 
           {/* Barras HP/MP */}
           {[
-            { label:"HP", value: Math.min(profile.stats.VIT * 10, 1000), max:1000, color:"#ff4466" },
-            { label:"MP", value: Math.min(profile.stats.PER * 5, 500),  max:500,  color:"#4f8cff" },
+            { label:"HP", value: Math.min(profile.stats.VIT * 50, 5000), max:5000, color:"#ff4466" },
+            { label:"MP", value: Math.min(profile.stats.PER * 20, 2000), max:2000, color:"#4f8cff" },
           ].map(b => (
             <div key={b.label} style={{ marginBottom:10 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
@@ -244,6 +244,94 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
             </div>
           ))}
         </div>
+
+        {/* Progressão de Ranks */}
+        {(() => {
+          const RANK_INFO = [
+            { rank:"E", minLevel:1,  maxLevel:4,  free:true  },
+            { rank:"D", minLevel:5,  maxLevel:9,  free:true  },
+            { rank:"C", minLevel:10, maxLevel:14, free:true  },
+            { rank:"B", minLevel:15, maxLevel:19, free:false },
+            { rank:"A", minLevel:20, maxLevel:29, free:false },
+            { rank:"S", minLevel:30, maxLevel:null, free:false },
+          ];
+          const currentRankInfo = RANK_INFO.find(r => rank === r.rank) || RANK_INFO[0];
+          const nextRankInfo    = RANK_INFO[RANK_INFO.indexOf(currentRankInfo) + 1];
+          const levelsToNext    = nextRankInfo ? nextRankInfo.minLevel - level : 0;
+          return (
+            <div style={{ background:"var(--bg-card)", border:"1px solid var(--border-dim)", borderRadius:6, padding:16 }}>
+              <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:14 }}>PROGRESSÃO DE RANK</div>
+
+              {/* Lista de ranks */}
+              <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:14 }}>
+                {RANK_INFO.map(r => {
+                  const isCurrent = r.rank === rank;
+                  const isPast    = RANK_INFO.indexOf(r) < RANK_INFO.indexOf(currentRankInfo);
+                  const rc        = RANK_COLORS[r.rank];
+                  return (
+                    <div key={r.rank} style={{ display:"flex", alignItems:"center", gap:10,
+                      background: isCurrent ? `${rc}10` : "transparent",
+                      border: isCurrent ? `1px solid ${rc}44` : "1px solid transparent",
+                      borderRadius:4, padding:"6px 8px" }}>
+                      <div style={{ width:28, height:28, borderRadius:3, flexShrink:0,
+                        background: isCurrent ? `${rc}20` : isPast ? `${rc}10` : "rgba(255,255,255,0.03)",
+                        border:`1px solid ${isCurrent ? rc : isPast ? `${rc}44` : "var(--border-dim)"}`,
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontFamily:"var(--font-title)", fontSize:11, fontWeight:700,
+                        color: isCurrent ? rc : isPast ? rc : "var(--text-dim)",
+                        opacity: r.free || isPremium || isCurrent || isPast ? 1 : 0.4 }}>
+                        {r.rank}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <span style={{ color: isCurrent ? rc : isPast ? "var(--text-mid)" : "var(--text-dim)",
+                            fontSize:11, fontFamily:"var(--font-title)", fontWeight: isCurrent ? 700 : 400 }}>
+                            Rank {r.rank}{isCurrent ? " ← atual" : ""}
+                          </span>
+                          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                            {!r.free && (
+                              <span style={{ fontSize:9, color:"var(--gold-core)", fontFamily:"var(--font-title)" }}>⚜</span>
+                            )}
+                            <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
+                              Lv.{r.minLevel}{r.maxLevel ? `–${r.maxLevel}` : "+"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {isPast && <span style={{ fontSize:12 }}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Próximo rank */}
+              {nextRankInfo && (
+                <div style={{ background:"rgba(79,140,255,0.05)", border:"1px solid rgba(79,140,255,0.15)",
+                  borderRadius:4, padding:"10px 12px" }}>
+                  <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:1, marginBottom:4 }}>
+                    PRÓXIMO RANK
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ color: RANK_COLORS[nextRankInfo.rank], fontSize:13,
+                      fontFamily:"var(--font-title)", fontWeight:700 }}>Rank {nextRankInfo.rank}</span>
+                    <span style={{ color:"var(--text-mid)", fontSize:11, fontFamily:"var(--font-mono)" }}>
+                      {levelsToNext} {levelsToNext === 1 ? "nível" : "níveis"} restantes
+                    </span>
+                  </div>
+                  {!nextRankInfo.free && !isPremium && (
+                    <div style={{ color:"var(--gold-core)", fontSize:10, fontFamily:"var(--font-body)", marginTop:6 }}>
+                      ⚜ Requer Premium para desbloquear Rank {nextRankInfo.rank}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!nextRankInfo && (
+                <div style={{ color:"var(--gold-core)", fontSize:11, fontFamily:"var(--font-title)",
+                  textAlign:"center", letterSpacing:2 }}>⚜ RANK MÁXIMO ATINGIDO</div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Progresso semanal */}
         <div style={{ background:"var(--bg-card)", border:"1px solid var(--border-dim)", borderRadius:6, padding:16 }}>
