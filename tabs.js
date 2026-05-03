@@ -8,7 +8,7 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
   const nameRef = React.useRef();
   const { level, xpInLevel, xpToNext } = computeLevel(profile.xp);
   const rank     = getRankForLevel(level);
-  const dispRank = FREE_RANKS.includes(rank) ? rank : "C";
+  const dispRank = isPremium ? rank : (FREE_RANKS.includes(rank) ? rank : "C");
   const xpPct    = Math.round((xpInLevel / xpToNext) * 100);
 
   const statValues = STAT_META.map(s => ({ ...s, value: profile.stats[s.key] || 10, max: 100 }));
@@ -276,12 +276,15 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
         {/* Progressão de Ranks */}
         {(() => {
           const RANK_INFO = [
-            { rank:"E", minLevel:1,  maxLevel:4,  free:true  },
-            { rank:"D", minLevel:5,  maxLevel:9,  free:true  },
-            { rank:"C", minLevel:10, maxLevel:14, free:true  },
-            { rank:"B", minLevel:15, maxLevel:19, free:false },
-            { rank:"A", minLevel:20, maxLevel:29, free:false },
-            { rank:"S", minLevel:30, maxLevel:null, free:false },
+            { rank:"E",        minLevel:1,   maxLevel:5,   free:true  },
+            { rank:"D",        minLevel:6,   maxLevel:15,  free:true  },
+            { rank:"C",        minLevel:16,  maxLevel:30,  free:true  },
+            { rank:"B",        minLevel:31,  maxLevel:50,  free:false },
+            { rank:"A",        minLevel:51,  maxLevel:80,  free:false },
+            { rank:"S",        minLevel:81,  maxLevel:120, free:false },
+            { rank:"SS",       minLevel:121, maxLevel:160, free:false },
+            { rank:"SSS",      minLevel:161, maxLevel:199, free:false },
+            { rank:"Nacional", minLevel:200, maxLevel:null,free:false },
           ];
           const currentRankInfo = RANK_INFO.find(r => rank === r.rank) || RANK_INFO[0];
           const nextRankInfo    = RANK_INFO[RANK_INFO.indexOf(currentRankInfo) + 1];

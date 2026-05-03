@@ -18,17 +18,24 @@ function getTimeToMidnight() {
 
 // ── XP / Nível ───────────────────────────────────────────────────
 function computeLevel(totalXP) {
-  let level = 1, req = 1000, accum = 0;
-  while (totalXP >= accum + req) { accum += req; level++; req = level * 1000; }
-  return { level, xpInLevel: totalXP - accum, xpToNext: req };
+  let level = 1, accum = 0;
+  while (true) {
+    const req = level * 200;
+    if (totalXP < accum + req) return { level, xpInLevel: totalXP - accum, xpToNext: req };
+    accum += req;
+    level++;
+  }
 }
 
 function getRankForLevel(level) {
-  if (level >= 30) return "S";
-  if (level >= 20) return "A";
-  if (level >= 15) return "B";
-  if (level >= 10) return "C";
-  if (level >= 5)  return "D";
+  if (level >= 200) return "Nacional";
+  if (level >= 161) return "SSS";
+  if (level >= 121) return "SS";
+  if (level >= 81)  return "S";
+  if (level >= 51)  return "A";
+  if (level >= 31)  return "B";
+  if (level >= 16)  return "C";
+  if (level >= 6)   return "D";
   return "E";
 }
 
@@ -89,8 +96,8 @@ function checkNewAchievements(profile, questLog) {
     streak_30:      profile.streak >= 30,
     level_5:        profile.level >= 5,
     level_10:       profile.level >= 10,
-    rank_d:         ["D","C","B","A","S"].includes(rank),
-    rank_c:         ["C","B","A","S"].includes(rank),
+    rank_d:         ["D","C","B","A","S","SS","SSS","Nacional"].includes(rank),
+    rank_c:         ["C","B","A","S","SS","SSS","Nacional"].includes(rank),
     str_30:         profile.stats.FOR >= 30,
     int_30:         profile.stats.INT >= 30,
     all_quests_day: allQuestsDoneToday(questLog),

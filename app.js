@@ -296,8 +296,8 @@ function App() {
   if (needsSetup) return <ProfileSetup onSave={handleProfileSave} session={session} />;
   if (!profile)   return <ProfileSetup onSave={handleProfileSave} session={session} />;
 
-  const dispRank = FREE_RANKS.includes(getRankForLevel(profile.level))
-    ? getRankForLevel(profile.level) : "C";
+  const trueRank = getRankForLevel(profile.level);
+  const dispRank = profile.is_premium ? trueRank : (FREE_RANKS.includes(trueRank) ? trueRank : "C");
 
   const tabContent = {
     status:       <StatusTab      profile={profile} questLog={questLog} onAvatarEdit={handleAvatarEdit}

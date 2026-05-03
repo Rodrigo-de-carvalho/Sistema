@@ -7,8 +7,15 @@ const SHIELDS_FREE      = 1;    // escudos de streak por mês (free)
 const SHIELDS_PREMIUM   = 4;    // escudos de streak por mês (premium)
 
 const RANK_COLORS = {
-  E: "#8899cc", D: "#00ff88", C: "#4f8cff",
-  B: "#9b5de5", A: "#ffd700", S: "#ff66dd",
+  E:        "#8899cc",
+  D:        "#00ff88",
+  C:        "#4f8cff",
+  B:        "#9b5de5",
+  A:        "#ffd700",
+  S:        "#ff66dd",
+  SS:       "#ff4444",
+  SSS:      "#ff8800",
+  Nacional: "#ffffff",
 };
 
 const GRADE_COLOR = {
