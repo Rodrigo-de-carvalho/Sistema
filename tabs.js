@@ -148,8 +148,8 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
           </div>
         )}
 
-        {/* Pontos de atributo */}
-        {profile.stat_points > 0 && (
+        {/* Pontos de atributo — apenas Premium */}
+        {isPremium && profile.stat_points > 0 && (
           <div style={{ background:"var(--bg-card)", border:"1px solid rgba(255,215,0,0.25)", borderRadius:6, padding:16 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
               <span style={{ color:"var(--gold-core)", fontSize:11, fontFamily:"var(--font-title)", letterSpacing:1 }}>PONTOS DISPONÍVEIS</span>
@@ -172,6 +172,37 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
                     fontFamily:"var(--font-mono)", fontSize:13, fontWeight:700 }}>+</button>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        {!isPremium && (
+          <div onClick={onShowPremium} style={{ cursor:"pointer", background:"var(--bg-card)",
+            border:"1px solid rgba(255,215,0,0.15)", borderRadius:6, padding:16 }}
+            onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(255,215,0,0.35)"}
+            onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(255,215,0,0.15)"}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+              <span style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-title)", letterSpacing:1 }}>DISTRIBUIR ATRIBUTOS</span>
+              <span style={{ background:"rgba(255,215,0,0.08)", border:"1px solid rgba(255,215,0,0.25)",
+                color:"var(--gold-core)", fontSize:9, padding:"2px 8px", fontFamily:"var(--font-title)", borderRadius:2 }}>
+                ⚜ PREMIUM
+              </span>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:7, opacity:0.4, pointerEvents:"none" }}>
+              {STAT_META.map(s => (
+                <div key={s.key} style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ color:s.color, width:32, fontSize:10, fontFamily:"var(--font-title)", fontWeight:700 }}>{s.key}</span>
+                  <span style={{ color:"var(--text-mid)", width:26, fontSize:11, fontFamily:"var(--font-mono)", textAlign:"right" }}>{profile.stats[s.key]}</span>
+                  <div style={{ flex:1, height:4, background:"rgba(255,255,255,0.05)", borderRadius:2, overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:`${(profile.stats[s.key]/100)*100}%`, background:s.color, borderRadius:2 }} />
+                  </div>
+                  <div style={{ width:22, height:22, borderRadius:2, border:"1px solid rgba(255,255,255,0.1)",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    color:"var(--text-dim)", fontSize:13, fontFamily:"var(--font-mono)" }}>+</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-body)", marginTop:10, textAlign:"center" }}>
+              Assinantes Premium ganham 3 pontos a cada nível para distribuir livremente
             </div>
           </div>
         )}

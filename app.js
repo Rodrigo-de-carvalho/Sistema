@@ -198,7 +198,9 @@ function App() {
         streak:      newStreak,
         last_active: newLastActive,
         gold:        newGold,
-        stat_points: prev.stat_points + (computeLevel(newXP).level > prev.level ? 3 : 0),
+        stat_points: prev.is_premium
+          ? prev.stat_points + (computeLevel(newXP).level > prev.level ? 3 : 0)
+          : 0,
       };
     });
   }, []);
