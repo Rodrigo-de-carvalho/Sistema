@@ -7,6 +7,8 @@ const TABS_CFG = [
   { id:"quests",    label:"Missões",     icon:"list-checks" },
   { id:"inventory", label:"Inventário",  icon:"package" },
   { id:"achievements", label:"Conquistas", icon:"trophy" },
+  { id:"social",    label:"Social",      icon:"users" },
+  { id:"guilds",    label:"Guildas",     icon:"shield" },
 ];
 
 function App() {
@@ -310,6 +312,8 @@ function App() {
                                   isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)} />,
     inventory:    <InventoryTab   profile={profile} />,
     achievements: <AchievementsTab profile={profile} />,
+    social:       <SocialTab myId={session?.user?.id} myName={profile.name} />,
+    guilds:       <GuildsTab myId={session?.user?.id} />,
   };
 
   return (

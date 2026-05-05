@@ -49,6 +49,87 @@
 //    after insert on auth.users
 //    for each row execute procedure public.handle_new_user();
 //
+// ── SQL — SOCIAL / GUILDAS (rode após a tabela profiles) ─────────
+//
+//  -- Leituras públicas de perfis para ranking
+//  create policy "Public profile reads"
+//    on public.profiles for select to authenticated using (true);
+//
+//  -- friendships
+//  create table public.friendships (
+//    id         uuid default gen_random_uuid() primary key,
+//    user_id    uuid references auth.users(id) on delete cascade,
+//    friend_id  uuid references auth.users(id) on delete cascade,
+//    status     text check (status in ('pending','accepted')) default 'pending',
+//    created_at timestamptz default now(),
+//    unique(user_id, friend_id)
+//  );
+//  alter table public.friendships enable row level security;
+//  create policy "View own friendships"  on public.friendships for select using (auth.uid()=user_id or auth.uid()=friend_id);
+//  create policy "Send requests"         on public.friendships for insert with check (auth.uid()=user_id);
+//  create policy "Update received"       on public.friendships for update using (auth.uid()=friend_id);
+//  create policy "Delete friendships"    on public.friendships for delete using (auth.uid()=user_id or auth.uid()=friend_id);
+//
+//  -- messages (chat entre amigos)
+//  create table public.messages (
+//    id          uuid default gen_random_uuid() primary key,
+//    sender_id   uuid references auth.users(id) on delete cascade,
+//    receiver_id uuid references auth.users(id) on delete cascade,
+//    content     text not null check (char_length(content) <= 500),
+//    created_at  timestamptz default now()
+//  );
+//  alter table public.messages enable row level security;
+//  create policy "View own messages" on public.messages for select using (auth.uid()=sender_id or auth.uid()=receiver_id);
+//  create policy "Send messages"     on public.messages for insert with check (auth.uid()=sender_id);
+//
+//  -- guilds
+//  create table public.guilds (
+//    id          uuid default gen_random_uuid() primary key,
+//    name        text not null unique,
+//    description text,
+//    owner_id    uuid references auth.users(id) on delete set null,
+//    created_at  timestamptz default now()
+//  );
+//  alter table public.guilds enable row level security;
+//  create policy "View guilds"   on public.guilds for select using (true);
+//  create policy "Create guild"  on public.guilds for insert with check (auth.uid()=owner_id);
+//  create policy "Update guild"  on public.guilds for update using (auth.uid()=owner_id);
+//  create policy "Delete guild"  on public.guilds for delete using (auth.uid()=owner_id);
+//
+//  -- guild_members
+//  create table public.guild_members (
+//    id        uuid default gen_random_uuid() primary key,
+//    guild_id  uuid references public.guilds(id) on delete cascade,
+//    user_id   uuid references auth.users(id) on delete cascade,
+//    joined_at timestamptz default now(),
+//    unique(guild_id, user_id)
+//  );
+//  alter table public.guild_members enable row level security;
+//  create policy "View members" on public.guild_members for select using (true);
+//  create policy "Join guild"   on public.guild_members for insert with check (auth.uid()=user_id);
+//  create policy "Leave guild"  on public.guild_members for delete using (auth.uid()=user_id);
+//
+//  -- guild_messages
+//  create table public.guild_messages (
+//    id        uuid default gen_random_uuid() primary key,
+//    guild_id  uuid references public.guilds(id) on delete cascade,
+//    sender_id uuid references auth.users(id) on delete cascade,
+//    content   text not null check (char_length(content) <= 500),
+//    created_at timestamptz default now()
+//  );
+//  alter table public.guild_messages enable row level security;
+//  create policy "View guild messages" on public.guild_messages for select using (
+//    exists (select 1 from public.guild_members where guild_id=guild_messages.guild_id and user_id=auth.uid())
+//  );
+//  create policy "Send guild messages" on public.guild_messages for insert with check (
+//    auth.uid()=sender_id and
+//    exists (select 1 from public.guild_members where guild_id=guild_messages.guild_id and user_id=auth.uid())
+//  );
+//
+//  -- Ativar Realtime nas tabelas de chat
+//  alter publication supabase_realtime add table public.messages;
+//  alter publication supabase_realtime add table public.guild_messages;
+//
 // ════════════════════════════════════════════════════════════════
 
 const SUPABASE_URL      = 'https://SEU_PROJETO.supabase.co';

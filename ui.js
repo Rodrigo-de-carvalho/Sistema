@@ -35,6 +35,7 @@ const ICON_PATHS = {
   "trending-up":      "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
   "user":             "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
   "users":            "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  "message-circle":   "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   "x":                "M18 6 6 18M6 6l12 12",
   "zap":              "M13 2 3 14h9l-1 8 10-12h-9l1-8z",
   "layout-dashboard": "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
