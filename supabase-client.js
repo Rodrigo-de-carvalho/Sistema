@@ -132,8 +132,8 @@
 //
 // ════════════════════════════════════════════════════════════════
 
-const SUPABASE_URL      = 'https://SEU_PROJETO.supabase.co';
-const SUPABASE_ANON_KEY = 'SUA_CHAVE_ANONIMA_AQUI';
+const SUPABASE_URL      = 'https://pkewogelkjuvqvmhytwr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_HGkPnjK6IUYFcr09QRSGvw_Kl9f17vw';
 
 window.SUPABASE_OK = false;
 window.sb = null;
