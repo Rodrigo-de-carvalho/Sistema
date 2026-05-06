@@ -86,9 +86,10 @@ function App() {
       if (cached) {
         let p = resetShieldsIfNewMonth(cached);
         const { profile: p2, shieldUsed: su1 } = checkStreakShield(p);
-        setProfile(p2);
-        setQuestLog(p2.quest_log || {});
-        initDailyQuests(p2);
+        const p2Fixed = { ...p2, level: computeLevel(p2.xp || 0).level };
+        setProfile(p2Fixed);
+        setQuestLog(p2Fixed.quest_log || {});
+        initDailyQuests(p2Fixed);
         if (su1) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
       }
 
@@ -101,10 +102,11 @@ function App() {
           if (remote) {
             let p = resetShieldsIfNewMonth(remote);
             const { profile: p2, shieldUsed: su2 } = checkStreakShield(p);
-            setProfile(p2);
-            setQuestLog(p2.quest_log || {});
-            initDailyQuests(p2);
-            saveProfile(p2);
+            const p2Fixed = { ...p2, level: computeLevel(p2.xp || 0).level };
+            setProfile(p2Fixed);
+            setQuestLog(p2Fixed.quest_log || {});
+            initDailyQuests(p2Fixed);
+            saveProfile(p2Fixed);
             if (su2) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
           } else if (!cached) {
             setNeedsSetup(true);
@@ -133,28 +135,37 @@ function App() {
   // ── Checar conquistas quando perfil ou log mudam ─────────────
   useEffect(() => {
     if (!profile) return;
-    const newly = checkNewAchievements(profile, questLog);
-    if (newly.length === 0) return;
-    const bonusXP    = newly.reduce((s, a) => s + a.xp, 0);
-    const newAchIds  = newly.map(a => a.id);
-    const newItems   = newAchIds.flatMap(id => ACH_TO_ITEMS[id] || []);
-    const newTitles  = newItems.filter(id => INVENTORY_ITEMS.find(i=>i.id===id&&i.type==="Título"))
-                        .map(id => INVENTORY_ITEMS.find(i=>i.id===id)?.name).filter(Boolean);
+    // Conquistas que merecem ser ganhas AGORA (baseado no estado atual)
+    const currentIds = computeCurrentAchievements(profile, questLog);
+    const newlyEarned = currentIds.filter(id => !profile.achievements.includes(id));
+    const lost        = profile.achievements.filter(id => !currentIds.includes(id));
+
+    // Nada mudou
+    if (newlyEarned.length === 0 && lost.length === 0) return;
+
+    const bonusXP  = newlyEarned.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
+    const newItems = newlyEarned.flatMap(id => ACH_TO_ITEMS[id] || []);
+    const newTitles = newItems
+      .filter(id => INVENTORY_ITEMS.find(i=>i.id===id&&i.type==="Título"))
+      .map(id => INVENTORY_ITEMS.find(i=>i.id===id)?.name).filter(Boolean);
 
     setProfile(prev => {
       if (!prev) return prev;
       return {
         ...prev,
-        xp:             prev.xp + bonusXP,
-        achievements:   [...prev.achievements, ...newAchIds],
-        inventory_items:[...new Set([...(prev.inventory_items||[]), ...newItems])],
-        titles:         [...new Set([...prev.titles, ...newTitles])],
+        xp:              prev.xp + bonusXP,
+        achievements:    currentIds,                    // reflete estado real
+        inventory_items: [...new Set([...(prev.inventory_items||[]), ...newItems])],
+        titles:          [...new Set([...prev.titles, ...newTitles])],
       };
     });
 
-    newly.forEach(a => addAlert(`Conquista: ${a.name}`, `+${a.xp} XP · ${a.grade}`, "success"));
-  }, [profile?.achievements?.length, profile?.streak, profile?.level,
-      profile?.stats?.FOR, profile?.stats?.INT, JSON.stringify(Object.keys(questLog))]);
+    newlyEarned.forEach(id => {
+      const a = ACHIEVEMENTS.find(x => x.id === id);
+      if (a) addAlert(`Conquista: ${a.name}`, `+${a.xp} XP · ${a.grade}`, "success");
+    });
+  }, [profile?.streak, profile?.level, profile?.stats?.FOR, profile?.stats?.INT,
+      JSON.stringify(Object.keys(questLog)), countTotalTasks(questLog)]);
 
   // ── Verificar gate premium ───────────────────────────────────
   useEffect(() => {
@@ -424,9 +435,9 @@ function App() {
                   onClick={() => setTab(t.id)}
                   onMouseDown={e => e.preventDefault()}
                   style={{
-                    display:"flex", alignItems:"center", gap:7,
+                    display:"flex", alignItems:"center", gap:7, position:"relative",
                     background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
-                    border:"none", borderBottom:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                    border:"none",
                     color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
                     padding:"0 16px", height:52, cursor:"pointer",
                     fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
@@ -435,6 +446,7 @@ function App() {
                   }}>
                   <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
                   {t.label}
+                  {tab===t.id && <div style={{ position:"absolute", bottom:0, left:0, right:0, height:2, background:"var(--blue-core)", pointerEvents:"none" }} />}
                 </button>
               ))}
             </div>
@@ -534,13 +546,13 @@ function App() {
                 onMouseDown={e => e.preventDefault()}
                 style={{
                   flex:1, height:"100%", background:"transparent", border:"none",
-                  borderTop:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
                   color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
                   cursor:"pointer", display:"flex", flexDirection:"column",
-                  alignItems:"center", justifyContent:"center", gap:3,
-                  transition:"background 0.15s, color 0.15s",
+                  alignItems:"center", justifyContent:"center", gap:3, position:"relative",
+                  transition:"color 0.15s",
                   WebkitTapHighlightColor:"transparent", outline:"none",
                 }}>
+                {tab===t.id && <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:"var(--blue-core)", pointerEvents:"none" }} />}
                 <Icon name={t.icon} size={18} color={tab===t.id?"var(--blue-core)":undefined} />
                 <span style={{ fontFamily:"var(--font-title)", fontSize:8, letterSpacing:1 }}>{t.label}</span>
               </button>

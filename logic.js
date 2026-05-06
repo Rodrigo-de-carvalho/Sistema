@@ -96,10 +96,10 @@ function computeStreak(lastActive, currentStreak) {
 }
 
 // ── Conquistas ───────────────────────────────────────────────────
-function checkNewAchievements(profile, questLog) {
-  const total  = countTotalTasks(questLog);
-  const rank   = getRankForLevel(profile.level);
-  const checks = {
+function _achievementChecks(profile, questLog) {
+  const total = countTotalTasks(questLog);
+  const rank  = getRankForLevel(profile.level);
+  return {
     first_task:     total >= 1,
     first_quest:    DAILY_QUESTS.some(q => isQuestComplete(questLog, q.id)),
     streak_3:       profile.streak >= 3,
@@ -115,7 +115,18 @@ function checkNewAchievements(profile, questLog) {
     tasks_50:       total >= 50,
     tasks_100:      total >= 100,
   };
+}
+
+// Retorna conquistas recém-ganhas (ainda não no perfil)
+function checkNewAchievements(profile, questLog) {
+  const checks = _achievementChecks(profile, questLog);
   return ACHIEVEMENTS.filter(a => checks[a.id] && !profile.achievements.includes(a.id));
+}
+
+// Retorna o conjunto ATUAL de conquistas merecidas (para sincronizar estado)
+function computeCurrentAchievements(profile, questLog) {
+  const checks = _achievementChecks(profile, questLog);
+  return ACHIEVEMENTS.filter(a => checks[a.id]).map(a => a.id);
 }
 
 // ── Missions XP Granted ──────────────────────────────────────────
