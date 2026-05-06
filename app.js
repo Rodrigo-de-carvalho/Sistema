@@ -231,9 +231,8 @@ function App() {
     setProfile(prev => {
       if (!prev) return prev;
       const newXP    = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
-      // Nível só sobe quando há XP real; qualquer outro caso protege contra regressão
-      const computed = computeLevel(newXP).level;
-      const newLevel = effectiveXP > 0 ? computed : Math.max(prev.level, computed);
+      // Nível segue o XP diretamente — sobe ao marcar, desce ao desmarcar
+      const newLevel = computeLevel(newXP).level;
       // Stat e gold só mudam quando há movimento real de XP
       const statDelta = effectiveXP > 0 ? 1 : (isDone && storedXP > 0) ? -1 : 0;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
@@ -421,16 +420,19 @@ function App() {
           {!isMobile && (
             <div style={{ display:"flex", gap:2, flex:1 }}>
               {TABS_CFG.map(t => (
-                <button key={t.id} onClick={() => setTab(t.id)} style={{
-                  display:"flex", alignItems:"center", gap:7,
-                  background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
-                  border:"none", borderBottom:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
-                  color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
-                  padding:"0 16px", height:52, cursor:"pointer",
-                  fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-                  transition:"background 0.15s, color 0.15s",
-                  WebkitTapHighlightColor:"transparent",
-                }}>
+                <button key={t.id}
+                  onClick={() => setTab(t.id)}
+                  onMouseDown={e => e.preventDefault()}
+                  style={{
+                    display:"flex", alignItems:"center", gap:7,
+                    background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
+                    border:"none", borderBottom:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                    color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
+                    padding:"0 16px", height:52, cursor:"pointer",
+                    fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
+                    transition:"background 0.15s, color 0.15s",
+                    WebkitTapHighlightColor:"transparent", outline:"none",
+                  }}>
                   <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
                   {t.label}
                 </button>
@@ -527,15 +529,18 @@ function App() {
             background:"rgba(3,3,12,0.97)", borderTop:"1px solid var(--border-dim)",
             display:"flex", zIndex:200, backdropFilter:"blur(8px)" }}>
             {TABS_CFG.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                flex:1, height:"100%", background:"transparent", border:"none",
-                borderTop:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
-                color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
-                cursor:"pointer", display:"flex", flexDirection:"column",
-                alignItems:"center", justifyContent:"center", gap:3,
-                transition:"background 0.15s, color 0.15s",
-                WebkitTapHighlightColor:"transparent",
-              }}>
+              <button key={t.id}
+                onClick={() => setTab(t.id)}
+                onMouseDown={e => e.preventDefault()}
+                style={{
+                  flex:1, height:"100%", background:"transparent", border:"none",
+                  borderTop:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                  color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
+                  cursor:"pointer", display:"flex", flexDirection:"column",
+                  alignItems:"center", justifyContent:"center", gap:3,
+                  transition:"background 0.15s, color 0.15s",
+                  WebkitTapHighlightColor:"transparent", outline:"none",
+                }}>
                 <Icon name={t.icon} size={18} color={tab===t.id?"var(--blue-core)":undefined} />
                 <span style={{ fontFamily:"var(--font-title)", fontSize:8, letterSpacing:1 }}>{t.label}</span>
               </button>
