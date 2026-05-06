@@ -40,6 +40,13 @@ function getRankForLevel(level) {
   return "E";
 }
 
+// XP mínimo acumulado para estar no início de um nível (floor do nível)
+function xpFloorForLevel(level) {
+  let accum = 0;
+  for (let l = 1; l < level; l++) accum += xpForLevel(l);
+  return accum;
+}
+
 // ── Quest helpers ────────────────────────────────────────────────
 function getDayLog(questLog, date) {
   return questLog[date] || {};

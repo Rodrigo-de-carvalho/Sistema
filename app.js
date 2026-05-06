@@ -227,13 +227,14 @@ function App() {
     // Atualiza perfil
     setProfile(prev => {
       if (!prev) return prev;
-      const xpDelta   = isDone ? -storedXP : effectiveXP;
       const statDelta = isDone ? -1 : 1;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
-      const newXP     = Math.max(0, prev.xp + xpDelta);
-      // Nível nunca reverte ao desmarcar — apenas avança ao marcar
-      const computedLevel = computeLevel(newXP).level;
-      const newLevel  = isDone ? Math.max(prev.level, computedLevel) : computedLevel;
+      // Ao desmarcar: clampa XP ao floor do nível atual para rank nunca regredir
+      const rawXP = prev.xp + (isDone ? -storedXP : effectiveXP);
+      const newXP = isDone
+        ? Math.max(xpFloorForLevel(prev.level), rawXP)
+        : Math.max(0, rawXP);
+      const newLevel = computeLevel(newXP).level;
 
       // Streak só avança ao marcar
       let newStreak     = prev.streak;
