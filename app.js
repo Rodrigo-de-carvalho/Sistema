@@ -29,7 +29,14 @@ function App() {
   // Missões: lista fixa do dia (calculada uma vez no load) e registro de XP concedido
   const [dailyQuests,     setDailyQuests]      = useState(null);
   const [missionsGranted, setMissionsGranted]  = useState(() => loadMissionsGranted());
-  const dailyQuestsSetRef = React.useRef(false);
+  const dailyQuestsSetRef    = React.useRef(false);
+  // Refs sempre atuais — imunes ao batching do React 18 em cliques rápidos
+  const questLogRef          = React.useRef({});
+  const missionsGrantedRef   = React.useRef(loadMissionsGranted());
+
+  // Mantém refs em sincronia com o estado a cada render
+  questLogRef.current        = questLog;
+  missionsGrantedRef.current = missionsGranted;
 
   // ── Relógio + countdown + reset de missões à meia-noite ─────
   useEffect(() => {
@@ -190,54 +197,47 @@ function App() {
     const today = todayKey();
     const yest  = yesterdayKey();
 
-    // Garante registro válido para hoje (proteção contra app aberto à meia-noite)
-    const currentGranted = missionsGranted.date === today ? missionsGranted : { date: today, granted: [] };
+    // Lê dos REFS (sempre atuais) — não da closure, que pode estar stale
+    // quando React 18 agrupa eventos de clique rápidos no mesmo batch.
+    const ql = questLogRef.current;
+    const mg = missionsGrantedRef.current;
 
-    // Estado atual da task no questLog (closure atual, não stale)
-    const rawVal    = (questLog[today]?.[questId] || {})[taskId];
-    const isDone    = !!rawVal;
-    // XP que foi armazenado quando a task foi marcada (para subtração exata)
-    const storedXP  = typeof rawVal === "number" ? rawVal : 0;
-    // Task já concedeu XP hoje?
-    const alreadyGranted = currentGranted.granted.includes(taskId);
+    const rawVal         = (ql[today]?.[questId] || {})[taskId];
+    const isDone         = !!rawVal;
+    const storedXP       = typeof rawVal === "number" ? rawVal : 0;
+    const grantedList    = mg.date === today ? mg.granted : [];
+    const alreadyGranted = grantedList.includes(taskId);
 
-    // XP efetivo a conceder: só se marcando E ainda não concedeu
     const effectiveXP = (!isDone && !alreadyGranted)
       ? (profile?.is_premium ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP)
       : 0;
 
-    // Atualiza questLog: armazena número (XP) ao marcar, false ao desmarcar
-    setQuestLog(prev => {
-      const d = prev[today] || {};
-      const q = d[questId] || {};
-      return { ...prev, [today]: { ...d, [questId]: { ...q, [taskId]: isDone ? false : effectiveXP || true } } };
-    });
+    // Calcula novos valores
+    const newTaskVal  = isDone ? false : (effectiveXP || true);
+    const newDayLog   = { ...(ql[today] || {}), [questId]: { ...((ql[today]?.[questId]) || {}), [taskId]: newTaskVal } };
+    const newQL       = { ...ql, [today]: newDayLog };
+    const newGranted  = (!isDone && !alreadyGranted) ? [...grantedList, taskId] : grantedList;
+    const newMG       = { date: today, granted: newGranted };
 
-    // Atualiza registro de missões concedidas.
-    // granted nunca remove um ID ao desmarcar — é proteção permanente do dia.
-    // Assim re-marcar após desmarcar não concede XP novamente.
-    setMissionsGranted(prev => {
-      const base = prev.date === today ? prev : { date: today, granted: [] };
-      if (!isDone && !alreadyGranted) {
-        return { date: today, granted: [...base.granted, taskId] };
-      }
-      return base;
-    });
+    // Atualiza refs IMEDIATAMENTE — cliques subsequentes antes do re-render
+    // já verão o estado correto sem esperar pelo setState ser processado.
+    questLogRef.current        = newQL;
+    missionsGrantedRef.current = newMG;
 
-    // Atualiza perfil
+    // Propaga para o estado React (causa o re-render)
+    setQuestLog(newQL);
+    setMissionsGranted(newMG);
+
     setProfile(prev => {
       if (!prev) return prev;
       const statDelta = isDone ? -1 : 1;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
       const newXP     = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
-      // Nível nunca regride; StatusTab usa profile.level diretamente
       const newLevel  = isDone
         ? Math.max(prev.level, computeLevel(newXP).level)
         : computeLevel(newXP).level;
 
-      // Streak só avança ao marcar
-      let newStreak     = prev.streak;
-      let newLastActive = prev.last_active;
+      let newStreak = prev.streak, newLastActive = prev.last_active;
       if (!isDone && prev.last_active !== today) {
         newStreak     = prev.last_active === yest ? prev.streak + 1 : 1;
         newLastActive = today;
@@ -253,12 +253,10 @@ function App() {
         streak:      newStreak,
         last_active: newLastActive,
         gold:        Math.max(0, prev.gold + goldDelta),
-        stat_points: prev.is_premium
-          ? prev.stat_points + (newLevel > prev.level ? 3 : 0)
-          : 0,
+        stat_points: prev.stat_points, // não modifica aqui para evitar reset
       };
     });
-  }, [questLog, missionsGranted, profile?.is_premium]);
+  }, [profile?.is_premium]); // refs não precisam estar no dep array
 
   // ── Distribuir ponto de atributo ─────────────────────────────
   const handleStatPoint = useCallback((statKey) => {
@@ -307,11 +305,14 @@ function App() {
   }, []);
 
   const handleProfileSave = useCallback(async (newProfile) => {
+    const freshMG = { date: todayKey(), granted: [] };
     setProfile(newProfile);
     setQuestLog({});
-    setMissionsGranted({ date: todayKey(), granted: [] });
+    setMissionsGranted(freshMG);
+    questLogRef.current        = {};
+    missionsGrantedRef.current = freshMG;
     setDailyQuests(getQuestsForRank(getRankForLevel(newProfile.level)));
-    dailyQuestsSetRef.current = true;
+    dailyQuestsSetRef.current  = true;
     saveProfile(newProfile);
     if (session) await syncToSupabase(newProfile, session.user.id);
     setNeedsSetup(false);
@@ -322,9 +323,12 @@ function App() {
     if (window.sb) await window.sb.auth.signOut();
     localStorage.removeItem("sistema_profile");
     localStorage.removeItem("sistema_missions_xp");
+    const emptyMG = { date: todayKey(), granted: [] };
     setProfile(null); setQuestLog({}); setSession(null);
-    setMissionsGranted({ date: todayKey(), granted: [] });
-    dailyQuestsSetRef.current = false;
+    setMissionsGranted(emptyMG);
+    questLogRef.current        = {};
+    missionsGrantedRef.current = emptyMG;
+    dailyQuestsSetRef.current  = false;
     setDailyQuests(null);
     setShowAuth(!!window.SUPABASE_OK);
     if (!window.SUPABASE_OK) setNeedsSetup(true);
