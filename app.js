@@ -229,12 +229,11 @@ function App() {
       if (!prev) return prev;
       const statDelta = isDone ? -1 : 1;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
-      // Ao desmarcar: clampa XP ao floor do nível atual para rank nunca regredir
-      const rawXP = prev.xp + (isDone ? -storedXP : effectiveXP);
-      const newXP = isDone
-        ? Math.max(xpFloorForLevel(prev.level), rawXP)
-        : Math.max(0, rawXP);
-      const newLevel = computeLevel(newXP).level;
+      const newXP     = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
+      // Nível nunca regride; StatusTab usa profile.level diretamente
+      const newLevel  = isDone
+        ? Math.max(prev.level, computeLevel(newXP).level)
+        : computeLevel(newXP).level;
 
       // Streak só avança ao marcar
       let newStreak     = prev.streak;

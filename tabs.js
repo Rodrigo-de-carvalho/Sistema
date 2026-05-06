@@ -6,7 +6,10 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
   const [editingName, setEditingName] = React.useState(false);
   const [nameInput,   setNameInput]   = React.useState(profile.name);
   const nameRef = React.useRef();
-  const { level, xpInLevel, xpToNext } = computeLevel(profile.xp);
+  const level    = profile.level;  // nível protegido — nunca regride
+  const floor    = xpFloorForLevel(level);
+  const xpInLevel = Math.max(0, profile.xp - floor);
+  const xpToNext  = xpForLevel(level);
   const rank     = getRankForLevel(level);
   const dispRank = isPremium ? rank : (FREE_RANKS.includes(rank) ? rank : "C");
   const xpPct    = Math.round((xpInLevel / xpToNext) * 100);
