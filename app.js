@@ -232,10 +232,10 @@ function App() {
       if (!prev) return prev;
       const statDelta = isDone ? -1 : 1;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
-      const newXP     = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
-      const newLevel  = isDone
-        ? Math.max(prev.level, computeLevel(newXP).level)
-        : computeLevel(newXP).level;
+      const newXP    = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
+      // Nível só avança quando há XP real a ganhar; qualquer outro caso protege
+      const computed = computeLevel(newXP).level;
+      const newLevel = effectiveXP > 0 ? computed : Math.max(prev.level, computed);
 
       let newStreak = prev.streak, newLastActive = prev.last_active;
       if (!isDone && prev.last_active !== today) {
