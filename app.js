@@ -357,17 +357,20 @@ function App() {
           {!isMobile && (
             <div style={{ display:"flex", gap:2, flex:1 }}>
               {TABS_CFG.map(t => (
-                <button key={t.id} onClick={() => setTab(t.id)} style={{
-                  display:"flex", alignItems:"center", gap:7,
-                  background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
-                  border:"none",
-                  boxShadow: tab===t.id?"inset 0 -2px 0 var(--blue-core)":"none",
-                  color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
-                  padding:"0 16px", height:52, cursor:"pointer",
-                  fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-                  transition:"none", outline:"none",
-                  WebkitTapHighlightColor:"transparent",
-                }}>
+                <button key={t.id}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    display:"flex", alignItems:"center", gap:7,
+                    background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
+                    border:"none",
+                    boxShadow: tab===t.id?"inset 0 -2px 0 var(--blue-core)":"none",
+                    color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
+                    padding:"0 16px", height:52, cursor:"pointer",
+                    fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
+                    transition:"none", outline:"none",
+                    WebkitTapHighlightColor:"transparent",
+                  }}>
                   <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
                   {t.label}
                 </button>
@@ -464,15 +467,18 @@ function App() {
             background:"rgba(3,3,12,0.97)", borderTop:"1px solid var(--border-dim)",
             display:"flex", zIndex:200, backdropFilter:"blur(8px)" }}>
             {TABS_CFG.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                flex:1, height:"100%", background:"transparent", border:"none",
-                boxShadow: tab===t.id?"inset 0 2px 0 var(--blue-core)":"none",
-                color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
-                cursor:"pointer", display:"flex", flexDirection:"column",
-                alignItems:"center", justifyContent:"center", gap:3,
-                transition:"none", outline:"none",
-                WebkitTapHighlightColor:"transparent",
-              }}>
+              <button key={t.id}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setTab(t.id)}
+                style={{
+                  flex:1, height:"100%", background:"transparent", border:"none",
+                  boxShadow: tab===t.id?"inset 0 2px 0 var(--blue-core)":"none",
+                  color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
+                  cursor:"pointer", display:"flex", flexDirection:"column",
+                  alignItems:"center", justifyContent:"center", gap:3,
+                  transition:"none", outline:"none",
+                  WebkitTapHighlightColor:"transparent",
+                }}>
                 <Icon name={t.icon} size={18} color={tab===t.id?"var(--blue-core)":undefined} />
                 <span style={{ fontFamily:"var(--font-title)", fontSize:8, letterSpacing:1 }}>{t.label}</span>
               </button>

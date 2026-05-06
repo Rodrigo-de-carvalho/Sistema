@@ -364,15 +364,18 @@ function SocialTab({ myId, myName }) {
   }
 
   const subTabBtn = (id, label, count) => (
-    <button key={id} onClick={() => setSubTab(id)} style={{
-      flex:1, padding:"8px 4px", border:"none", cursor:"pointer",
-      background: subTab===id ? "rgba(79,140,255,0.15)" : "transparent",
-      boxShadow: subTab===id ? "inset 0 -2px 0 var(--blue-core)" : "none",
-      color: subTab===id ? "var(--text-bright)" : "var(--text-dim)",
-      fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-      display:"flex", alignItems:"center", justifyContent:"center", gap:5,
-      transition:"none", outline:"none",
-    }}>
+    <button key={id}
+      onMouseDown={e => e.preventDefault()}
+      onClick={() => setSubTab(id)}
+      style={{
+        flex:1, padding:"8px 4px", border:"none", cursor:"pointer",
+        background: subTab===id ? "rgba(79,140,255,0.15)" : "transparent",
+        boxShadow: subTab===id ? "inset 0 -2px 0 var(--blue-core)" : "none",
+        color: subTab===id ? "var(--text-bright)" : "var(--text-dim)",
+        fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
+        display:"flex", alignItems:"center", justifyContent:"center", gap:5,
+        transition:"none", outline:"none",
+      }}>
       {label}
       {count > 0 && (
         <span style={{ background:"var(--blue-core)", color:"white",
@@ -540,15 +543,18 @@ function SocialTab({ myId, myName }) {
           {/* Global / Entre amigos */}
           <div style={{ display:"flex", gap:6, marginBottom:14 }}>
             {["global","amigos"].map(k => (
-              <button key={k} onClick={() => setRankSubTab(k)} style={{
-                flex:1, padding:"7px",
-                border:`1px solid ${rankSubTab===k?"var(--blue-core)":"var(--border-dim)"}`,
-                background: rankSubTab===k ? "rgba(79,140,255,0.12)" : "transparent",
-                borderRadius:7, cursor:"pointer",
-                color: rankSubTab===k ? "var(--blue-core)" : "var(--text-dim)",
-                fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-                transition:"none", outline:"none",
-              }}>
+              <button key={k}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setRankSubTab(k)}
+                style={{
+                  flex:1, padding:"7px",
+                  border:`1px solid ${rankSubTab===k?"var(--blue-core)":"var(--border-dim)"}`,
+                  background: rankSubTab===k ? "rgba(79,140,255,0.12)" : "transparent",
+                  borderRadius:7, cursor:"pointer",
+                  color: rankSubTab===k ? "var(--blue-core)" : "var(--text-dim)",
+                  fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
+                  transition:"none", outline:"none",
+                }}>
                 {k === "global" ? "🌐 GLOBAL" : "👥 ENTRE AMIGOS"}
               </button>
             ))}

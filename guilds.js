@@ -325,14 +325,17 @@ function GuildsTab({ myId }) {
   }
 
   const innerTabBtn = (id, label) => (
-    <button key={id} onClick={() => setInnerTab(id)} style={{
-      flex:1, padding:"8px 4px", border:"none", cursor:"pointer",
-      background: innerTab===id ? "rgba(155,93,229,0.15)" : "transparent",
-      boxShadow: innerTab===id ? "inset 0 -2px 0 #9b5de5" : "none",
-      color: innerTab===id ? "var(--text-bright)" : "var(--text-dim)",
-      fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-      transition:"none", outline:"none",
-    }}>{label}</button>
+    <button key={id}
+      onMouseDown={e => e.preventDefault()}
+      onClick={() => setInnerTab(id)}
+      style={{
+        flex:1, padding:"8px 4px", border:"none", cursor:"pointer",
+        background: innerTab===id ? "rgba(155,93,229,0.15)" : "transparent",
+        boxShadow: innerTab===id ? "inset 0 -2px 0 #9b5de5" : "none",
+        color: innerTab===id ? "var(--text-bright)" : "var(--text-dim)",
+        fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
+        transition:"none", outline:"none",
+      }}>{label}</button>
   );
 
   // ── Dentro da guilda ──────────────────────────────────────────
