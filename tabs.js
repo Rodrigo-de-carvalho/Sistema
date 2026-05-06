@@ -644,17 +644,45 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
             </span>
           )}
         </div>
+        {/* Banner FOMO para free */}
+        {!isPremium && (
+          <div onClick={onShowPremium} style={{ cursor:"pointer", marginBottom:14, padding:"12px 16px",
+            background:"rgba(155,93,229,0.07)", border:"1px solid rgba(155,93,229,0.25)", borderRadius:6,
+            display:"flex", alignItems:"center", gap:12 }}>
+            <Icon name="star" size={16} color="var(--gold-core)" />
+            <div style={{ flex:1 }}>
+              <div style={{ color:"var(--gold-core)", fontSize:11, fontFamily:"var(--font-title)", letterSpacing:1, marginBottom:2 }}>
+                ⚜ DESBLOQUEIE MISSÕES SEMANAIS COM PREMIUM
+              </div>
+              <div style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-body)" }}>
+                Ganhe até +{WEEKLY_QUESTS.reduce((s,q)=>s+q.tasks.reduce((s2,t)=>s2+t.xp,0)+q.bonusXP,0).toLocaleString()} XP extra por semana. Toque para saber mais.
+              </div>
+            </div>
+            <Icon name="chevron-right" size={14} color="var(--purple-glow)" />
+          </div>
+        )}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
           {WEEKLY_QUESTS.map(q => (
-            <div key={q.id} style={{ position:"relative", borderRadius:6, overflow:"hidden",
-              background:"rgba(10,10,26,0.6)", border:"1px solid rgba(155,93,229,0.2)" }}>
-              <div style={{ padding:16, filter: isPremium?"none":"blur(1.5px)" }}>
+            <div key={q.id} style={{ borderRadius:6, overflow:"hidden",
+              background:"rgba(10,10,26,0.6)",
+              border: isPremium ? "1px solid rgba(155,93,229,0.2)" : "1px solid rgba(155,93,229,0.15)",
+              opacity: isPremium ? 1 : 0.85 }}>
+              <div style={{ padding:16 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                   <div>
-                    <span style={{ background:"rgba(155,93,229,0.15)", border:"1px solid rgba(155,93,229,0.35)",
-                      color:"var(--purple-glow)", fontSize:9, padding:"2px 8px", fontFamily:"var(--font-title)",
-                      letterSpacing:1, borderRadius:2, display:"inline-block", marginBottom:8 }}>{q.category}</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                      <span style={{ background:"rgba(155,93,229,0.15)", border:"1px solid rgba(155,93,229,0.35)",
+                        color:"var(--purple-glow)", fontSize:9, padding:"2px 8px", fontFamily:"var(--font-title)",
+                        letterSpacing:1, borderRadius:2 }}>{q.category}</span>
+                      {!isPremium && (
+                        <span style={{ background:"rgba(255,215,0,0.1)", border:"1px solid rgba(255,215,0,0.3)",
+                          color:"var(--gold-core)", fontSize:9, padding:"2px 6px", fontFamily:"var(--font-title)", borderRadius:2 }}>
+                          ⚜ PREMIUM
+                        </span>
+                      )}
+                    </div>
                     <div style={{ color:"var(--text-bright)", fontSize:14, fontFamily:"var(--font-title)", fontWeight:600 }}>{q.title}</div>
+                    <div style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-body)", marginTop:4, lineHeight:1.4 }}>{q.desc}</div>
                   </div>
                   <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
                     <div style={{ color:"var(--purple-glow)", fontSize:11, fontFamily:"var(--font-mono)" }}>
@@ -666,24 +694,32 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
                 <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                   {q.tasks.map(t => (
                     <div key={t.id} style={{ display:"flex", alignItems:"center", gap:8,
-                      color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-body)" }}>
+                      padding:"6px 10px", borderRadius:4,
+                      background: isPremium ? "rgba(255,255,255,0.02)" : "rgba(155,93,229,0.04)",
+                      border:"1px solid rgba(155,93,229,0.1)",
+                      color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-body)",
+                      cursor: isPremium ? "pointer" : "default",
+                      opacity: isPremium ? 1 : 0.7 }}>
                       <div style={{ width:14, height:14, borderRadius:2, flexShrink:0,
-                        border:"1px solid rgba(155,93,229,0.3)" }} />
-                      {t.label}
-                      <span style={{ marginLeft:"auto", color:"var(--purple-glow)", fontSize:10,
-                        fontFamily:"var(--font-mono)", flexShrink:0 }}>+{t.xp}</span>
+                        border: isPremium ? "1px solid rgba(155,93,229,0.4)" : "1px solid rgba(155,93,229,0.2)",
+                        background:"transparent" }} />
+                      <span style={{ flex:1 }}>{t.label}</span>
+                      <span style={{ color:"var(--purple-glow)", fontSize:10, fontFamily:"var(--font-mono)", flexShrink:0 }}>+{t.xp} XP</span>
                     </div>
                   ))}
                 </div>
+                {/* CTA inline para free */}
+                {!isPremium && (
+                  <div onClick={onShowPremium} style={{ marginTop:12, padding:"8px 12px", borderRadius:4, cursor:"pointer",
+                    background:"rgba(255,215,0,0.06)", border:"1px solid rgba(255,215,0,0.2)",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                    <Icon name="lock" size={11} color="var(--gold-core)" />
+                    <span style={{ color:"var(--gold-core)", fontSize:10, fontFamily:"var(--font-title)", letterSpacing:1 }}>
+                      ATIVAR PREMIUM PARA COMPLETAR
+                    </span>
+                  </div>
+                )}
               </div>
-              {!isPremium && (
-                <div style={{ position:"absolute", inset:0, background:"rgba(2,2,10,0.65)",
-                  display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column",
-                  gap:8, cursor:"pointer" }} onClick={onShowPremium}>
-                  <Icon name="lock" size={22} color="rgba(155,93,229,0.7)" />
-                  <span style={{ color:"var(--gold-core)", fontSize:10, fontFamily:"var(--font-title)", letterSpacing:2 }}>⚜ PREMIUM</span>
-                </div>
-              )}
             </div>
           ))}
         </div>
