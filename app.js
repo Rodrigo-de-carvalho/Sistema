@@ -213,14 +213,13 @@ function App() {
       return { ...prev, [today]: { ...d, [questId]: { ...q, [taskId]: isDone ? false : effectiveXP || true } } };
     });
 
-    // Atualiza registro de missões concedidas
+    // Atualiza registro de missões concedidas.
+    // granted nunca remove um ID ao desmarcar — é proteção permanente do dia.
+    // Assim re-marcar após desmarcar não concede XP novamente.
     setMissionsGranted(prev => {
       const base = prev.date === today ? prev : { date: today, granted: [] };
       if (!isDone && !alreadyGranted) {
         return { date: today, granted: [...base.granted, taskId] };
-      }
-      if (isDone) {
-        return { date: today, granted: base.granted.filter(id => id !== taskId) };
       }
       return base;
     });
