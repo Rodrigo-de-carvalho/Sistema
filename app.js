@@ -165,27 +165,33 @@ function App() {
 
   // ── Completar / desmarcar tarefa ─────────────────────────────
   const handleTaskToggle = useCallback((questId, taskId, taskXP, taskStat) => {
-    const today  = todayKey();
-    const yest   = yesterdayKey();
+    const today = todayKey();
+    const yest  = yesterdayKey();
+
+    // Read current state from questLog closure — profile.quest_log is stale
+    const rawVal    = (questLog[today]?.[questId] || {})[taskId];
+    const isDone    = !!rawVal;
+    // Support legacy `true` values; store numeric XP when checking
+    const grantedXP = typeof rawVal === 'number' ? rawVal : (isDone ? taskXP : 0);
+    const effectiveXP = !isDone
+      ? (profile?.is_premium ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP)
+      : 0;
 
     setQuestLog(prev => {
-      const dayLog  = prev[today] || {};
-      const qLog    = dayLog[questId] || {};
-      const isDone  = !!qLog[taskId];
-      const newQLog = { ...qLog, [taskId]: !isDone };
-      return { ...prev, [today]: { ...dayLog, [questId]: newQLog } };
+      const d = prev[today] || {};
+      const q = d[questId] || {};
+      return { ...prev, [today]: { ...d, [questId]: { ...q, [taskId]: isDone ? false : effectiveXP } } };
     });
 
     setProfile(prev => {
       if (!prev) return prev;
-      const isDone  = !!(prev.quest_log?.[today]?.[questId]?.[taskId]);
-      const delta   = isDone ? -1 : 1;
-      const effectiveXP = (!isDone && prev.is_premium) ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP;
-      const newStat = Math.max(10, (prev.stats[taskStat] || 10) + delta);
-      const newXP   = Math.max(0, prev.xp + delta * effectiveXP);
+      const xpDelta   = isDone ? -grantedXP : effectiveXP;
+      const statDelta = isDone ? -1 : 1;
+      const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
+      const newXP     = Math.max(0, prev.xp + xpDelta);
       const { level } = computeLevel(newXP);
 
-      // Streak (só conta ao marcar, não desmarcar)
+      // Streak only advances on check, not uncheck
       let newStreak     = prev.streak;
       let newLastActive = prev.last_active;
       if (!isDone && prev.last_active !== today) {
@@ -193,7 +199,7 @@ function App() {
         newLastActive = today;
       }
 
-      const newGold = Math.max(0, prev.gold + delta * Math.floor(taskXP / 5));
+      const goldDelta = isDone ? -Math.floor(grantedXP / 5) : Math.floor(taskXP / 5);
 
       return {
         ...prev,
@@ -202,13 +208,13 @@ function App() {
         stats:       { ...prev.stats, [taskStat]: Math.min(100, newStat) },
         streak:      newStreak,
         last_active: newLastActive,
-        gold:        newGold,
+        gold:        Math.max(0, prev.gold + goldDelta),
         stat_points: prev.is_premium
           ? prev.stat_points + (computeLevel(newXP).level > prev.level ? 3 : 0)
           : 0,
       };
     });
-  }, []);
+  }, [questLog, profile?.is_premium]);
 
   // ── Distribuir ponto de atributo ─────────────────────────────
   const handleStatPoint = useCallback((statKey) => {
