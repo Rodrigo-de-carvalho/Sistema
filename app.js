@@ -364,7 +364,7 @@ function App() {
                   color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
                   padding:"0 16px", height:52, cursor:"pointer",
                   fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-                  transition:"background 0.15s, color 0.15s",
+                  transition:"none",
                   WebkitTapHighlightColor:"transparent",
                 }}>
                   <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
@@ -469,7 +469,7 @@ function App() {
                 color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
                 cursor:"pointer", display:"flex", flexDirection:"column",
                 alignItems:"center", justifyContent:"center", gap:3,
-                transition:"background 0.15s, color 0.15s",
+                transition:"none",
                 WebkitTapHighlightColor:"transparent",
               }}>
                 <Icon name={t.icon} size={18} color={tab===t.id?"var(--blue-core)":undefined} />

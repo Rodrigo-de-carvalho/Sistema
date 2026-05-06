@@ -371,7 +371,7 @@ function SocialTab({ myId, myName }) {
       color: subTab===id ? "var(--text-bright)" : "var(--text-dim)",
       fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
       display:"flex", alignItems:"center", justifyContent:"center", gap:5,
-      transition:"background 0.15s, color 0.15s",
+      transition:"none",
     }}>
       {label}
       {count > 0 && (

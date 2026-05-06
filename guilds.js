@@ -331,7 +331,7 @@ function GuildsTab({ myId }) {
       borderBottom: `2px solid ${innerTab===id ? "#9b5de5" : "transparent"}`,
       color: innerTab===id ? "var(--text-bright)" : "var(--text-dim)",
       fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-      transition:"background 0.15s, color 0.15s",
+      transition:"none",
     }}>{label}</button>
   );
 
