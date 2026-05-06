@@ -40,6 +40,9 @@ function getRankForLevel(level) {
   return "E";
 }
 
+// XP necessário para subir do nível l para l+1 (espelha computeLevel: req = level * 200)
+function xpForLevel(l) { return l * 200; }
+
 // XP mínimo acumulado para estar no início de um nível (floor do nível)
 function xpFloorForLevel(level) {
   let accum = 0;
