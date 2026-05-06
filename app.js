@@ -360,11 +360,12 @@ function App() {
                 <button key={t.id} onClick={() => setTab(t.id)} style={{
                   display:"flex", alignItems:"center", gap:7,
                   background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
-                  border:"none", borderBottom:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                  border:"none",
+                  boxShadow: tab===t.id?"inset 0 -2px 0 var(--blue-core)":"none",
                   color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
                   padding:"0 16px", height:52, cursor:"pointer",
                   fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-                  transition:"none",
+                  transition:"none", outline:"none",
                   WebkitTapHighlightColor:"transparent",
                 }}>
                   <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
@@ -465,11 +466,11 @@ function App() {
             {TABS_CFG.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 flex:1, height:"100%", background:"transparent", border:"none",
-                borderTop:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                boxShadow: tab===t.id?"inset 0 2px 0 var(--blue-core)":"none",
                 color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
                 cursor:"pointer", display:"flex", flexDirection:"column",
                 alignItems:"center", justifyContent:"center", gap:3,
-                transition:"none",
+                transition:"none", outline:"none",
                 WebkitTapHighlightColor:"transparent",
               }}>
                 <Icon name={t.icon} size={18} color={tab===t.id?"var(--blue-core)":undefined} />

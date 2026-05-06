@@ -44,8 +44,14 @@ input, button, select, textarea {
   outline: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
-button:focus, button:active { outline: none; }
+button:focus, button:active, button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
 
 /* ── Animations ── */
 @keyframes float-particles {
