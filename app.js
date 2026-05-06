@@ -230,20 +230,22 @@ function App() {
 
     setProfile(prev => {
       if (!prev) return prev;
-      const statDelta = isDone ? -1 : 1;
-      const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
       const newXP    = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
-      // Nível só avança quando há XP real a ganhar; qualquer outro caso protege
+      // Nível só sobe quando há XP real; qualquer outro caso protege contra regressão
       const computed = computeLevel(newXP).level;
       const newLevel = effectiveXP > 0 ? computed : Math.max(prev.level, computed);
+      // Stat e gold só mudam quando há movimento real de XP
+      const statDelta = effectiveXP > 0 ? 1 : (isDone && storedXP > 0) ? -1 : 0;
+      const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
+      const goldDelta = effectiveXP > 0
+        ? Math.floor(taskXP / 5)
+        : (isDone && storedXP > 0) ? -Math.floor(storedXP / 5) : 0;
 
       let newStreak = prev.streak, newLastActive = prev.last_active;
       if (!isDone && prev.last_active !== today) {
         newStreak     = prev.last_active === yest ? prev.streak + 1 : 1;
         newLastActive = today;
       }
-
-      const goldDelta = isDone ? -Math.floor(storedXP / 5) : Math.floor(taskXP / 5);
 
       return {
         ...prev,

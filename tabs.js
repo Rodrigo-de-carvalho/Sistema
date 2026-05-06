@@ -665,8 +665,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
           {WEEKLY_QUESTS.map(q => (
             <div key={q.id} style={{ borderRadius:6, overflow:"hidden",
               background:"rgba(10,10,26,0.6)",
-              border: isPremium ? "1px solid rgba(155,93,229,0.2)" : "1px solid rgba(155,93,229,0.15)",
-              opacity: isPremium ? 1 : 0.85 }}>
+              border: isPremium ? "1px solid rgba(155,93,229,0.2)" : "1px solid rgba(155,93,229,0.25)" }}>
               <div style={{ padding:16 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                   <div>
@@ -695,11 +694,10 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
                   {q.tasks.map(t => (
                     <div key={t.id} style={{ display:"flex", alignItems:"center", gap:8,
                       padding:"6px 10px", borderRadius:4,
-                      background: isPremium ? "rgba(255,255,255,0.02)" : "rgba(155,93,229,0.04)",
-                      border:"1px solid rgba(155,93,229,0.1)",
-                      color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-body)",
-                      cursor: isPremium ? "pointer" : "default",
-                      opacity: isPremium ? 1 : 0.7 }}>
+                      background: isPremium ? "rgba(255,255,255,0.02)" : "rgba(155,93,229,0.05)",
+                      border:"1px solid rgba(155,93,229,0.15)",
+                      color: isPremium ? "var(--text-dim)" : "var(--text-mid)", fontSize:11, fontFamily:"var(--font-body)",
+                      cursor: isPremium ? "pointer" : "default" }}>
                       <div style={{ width:14, height:14, borderRadius:2, flexShrink:0,
                         border: isPremium ? "1px solid rgba(155,93,229,0.4)" : "1px solid rgba(155,93,229,0.2)",
                         background:"transparent" }} />
