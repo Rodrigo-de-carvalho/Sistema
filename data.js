@@ -32,62 +32,139 @@ const STAT_META = [
   { key: "RES", label: "Resistência",  color: "#00ff88", desc: "Consistência de streak" },
 ];
 
-const DAILY_QUESTS = [
-  {
-    id: "force", category: "Força", title: "Regime de Força",
-    desc: "Fortaleça seu corpo. Cada repetição constrói disciplina.",
-    icon: "zap",
-    tasks: [
-      { id: "push_ups", label: "100 Flexões",       xp: 150, stat: "FOR" },
-      { id: "squats",   label: "100 Agachamentos",  xp: 150, stat: "FOR" },
-      { id: "abs",      label: "100 Abdominais",    xp: 100, stat: "VIT" },
-    ],
-    bonusXP: 100, gold: 200,
-  },
-  {
-    id: "cardio", category: "Agilidade", title: "Protocolo Cardio",
-    desc: "Melhore sua resistência cardiovascular com movimento.",
-    icon: "activity",
-    tasks: [
-      { id: "run_5km", label: "Correr 5km",         xp: 250, stat: "AGI" },
-      { id: "stretch", label: "Alongamento 15min",  xp: 100, stat: "AGI" },
-    ],
-    bonusXP: 100, gold: 175,
-  },
-  {
-    id: "study", category: "Inteligência", title: "Sessão de Estudos",
-    desc: "Invista em conhecimento. A mente é sua arma mais poderosa.",
-    icon: "book-open",
-    tasks: [
-      { id: "study_1h",    label: "Estudar 1 hora",            xp: 200, stat: "INT" },
-      { id: "read_30min",  label: "Ler por 30 minutos",        xp: 150, stat: "PER" },
-      { id: "practice",    label: "Praticar uma habilidade",   xp: 150, stat: "INT" },
-    ],
-    bonusXP: 150, gold: 225,
-  },
-  {
-    id: "wellness", category: "Vitalidade", title: "Protocolo de Bem-Estar",
-    desc: "Cuide do seu corpo. É o único que você tem.",
-    icon: "moon",
-    tasks: [
-      { id: "water_2l",  label: "Beber 2L de água",   xp: 100, stat: "VIT" },
-      { id: "sleep_8h",  label: "Dormir 8 horas",     xp: 200, stat: "VIT" },
-      { id: "eat_clean", label: "Alimentação limpa",  xp: 100, stat: "VIT" },
-    ],
-    bonusXP: 100, gold: 200,
-  },
-  {
-    id: "mind", category: "Percepção", title: "Clareza Mental",
-    desc: "Treine sua mente. Percepção aguçada é poder real.",
-    icon: "eye",
-    tasks: [
-      { id: "meditate", label: "Meditar 15 minutos",  xp: 150, stat: "PER" },
-      { id: "journal",  label: "Escrever no diário",  xp: 100, stat: "PER" },
-      { id: "no_phone", label: "1h sem telas",        xp: 150, stat: "RES" },
-    ],
-    bonusXP: 100, gold: 175,
-  },
-];
+// ── Missões por Rank ──────────────────────────────────────────────
+const RANK_QUESTS = {
+  E: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"Inicie sua jornada. Cada repetição conta.",                  icon:"zap",
+      tasks:[ { id:"push_10",   label:"10 Flexões",           xp:50,  stat:"FOR" },
+              { id:"squat_15",  label:"15 Agachamentos",      xp:50,  stat:"FOR" } ], bonusXP:50,  gold:100 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"Mova seu corpo. Um passo de cada vez.",                     icon:"activity",
+      tasks:[ { id:"walk_1k",   label:"Caminhar 1km",         xp:80,  stat:"AGI" } ], bonusXP:40,  gold:80  },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"A mente é uma arma. Comece a afiá-la.",                     icon:"book-open",
+      tasks:[ { id:"study_15m", label:"Estudar 15 minutos",   xp:80,  stat:"INT" } ], bonusXP:40,  gold:80  },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"Cuide do seu corpo. É a base de tudo.",                     icon:"moon",
+      tasks:[ { id:"water_2",   label:"Beber 2 copos de água",xp:60,  stat:"VIT" } ], bonusXP:30,  gold:60  },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"Cinco minutos de silêncio valem horas de ruído.",           icon:"eye",
+      tasks:[ { id:"med_5",     label:"Meditar 5 minutos",    xp:60,  stat:"PER" } ], bonusXP:30,  gold:60  },
+  ],
+  D: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"Seu corpo está se adaptando. Exija mais.",                  icon:"zap",
+      tasks:[ { id:"push_25",   label:"25 Flexões",           xp:100, stat:"FOR" },
+              { id:"squat_30",  label:"30 Agachamentos",      xp:100, stat:"FOR" } ], bonusXP:80,  gold:150 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"A resistência cardiovascular é sua armadura.",              icon:"activity",
+      tasks:[ { id:"run_2k",    label:"Correr 2km",           xp:150, stat:"AGI" } ], bonusXP:70,  gold:130 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"30 minutos de foco superam horas de distração.",           icon:"book-open",
+      tasks:[ { id:"study_30m", label:"Estudar 30 minutos",   xp:120, stat:"INT" } ], bonusXP:60,  gold:120 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"Hidratação é desempenho.",                                  icon:"moon",
+      tasks:[ { id:"water_4",   label:"Beber 4 copos de água",xp:80,  stat:"VIT" } ], bonusXP:50,  gold:100 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"A meditação forja a resistência mental.",                   icon:"eye",
+      tasks:[ { id:"med_10",    label:"Meditar 10 minutos",   xp:80,  stat:"PER" } ], bonusXP:50,  gold:100 },
+  ],
+  C: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"Meio centum. A disciplina está se tornando hábito.",        icon:"zap",
+      tasks:[ { id:"push_50",   label:"50 Flexões",           xp:150, stat:"FOR" },
+              { id:"squat_50",  label:"50 Agachamentos",      xp:150, stat:"FOR" } ], bonusXP:120, gold:200 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"3km por dia constrói um corredor de elite.",               icon:"activity",
+      tasks:[ { id:"run_3k",    label:"Correr 3km",           xp:200, stat:"AGI" } ], bonusXP:100, gold:175 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"45 minutos de estudo profundo. Sem distrações.",           icon:"book-open",
+      tasks:[ { id:"study_45m", label:"Estudar 45 minutos",   xp:160, stat:"INT" } ], bonusXP:90,  gold:170 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"Seis copos por dia. Seu corpo agradece.",                   icon:"moon",
+      tasks:[ { id:"water_6",   label:"Beber 6 copos de água",xp:100, stat:"VIT" } ], bonusXP:70,  gold:140 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"A mente quieta enxerga o que a mente agitada não vê.",     icon:"eye",
+      tasks:[ { id:"med_15",    label:"Meditar 15 minutos",   xp:100, stat:"PER" } ], bonusXP:70,  gold:140 },
+  ],
+  B: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"Centum. Um guerreiro forja o corpo sem piedade.",           icon:"zap",
+      tasks:[ { id:"push_100",  label:"100 Flexões",          xp:200, stat:"FOR" },
+              { id:"squat_80",  label:"80 Agachamentos",      xp:180, stat:"FOR" } ], bonusXP:160, gold:280 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"5km é onde os fortes se separam dos medianos.",            icon:"activity",
+      tasks:[ { id:"run_5k",    label:"Correr 5km",           xp:280, stat:"AGI" } ], bonusXP:130, gold:250 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"Uma hora de foco absoluto. A mente como um laser.",        icon:"book-open",
+      tasks:[ { id:"study_1h",  label:"Estudar 1 hora",       xp:220, stat:"INT" } ], bonusXP:120, gold:220 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"Oito copos. Sem negociação.",                              icon:"moon",
+      tasks:[ { id:"water_8",   label:"Beber 8 copos de água",xp:130, stat:"VIT" } ], bonusXP:90,  gold:180 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"20 minutos de meditação profunda. Domínio mental.",        icon:"eye",
+      tasks:[ { id:"med_20",    label:"Meditar 20 minutos",   xp:130, stat:"PER" } ], bonusXP:90,  gold:180 },
+  ],
+  A: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"Elite. 150 repetições que testam os limites humanos.",     icon:"zap",
+      tasks:[ { id:"push_150",  label:"150 Flexões",          xp:270, stat:"FOR" },
+              { id:"squat_120", label:"120 Agachamentos",     xp:240, stat:"FOR" } ], bonusXP:210, gold:380 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"8km. Cada metro é uma vitória sobre si mesmo.",           icon:"activity",
+      tasks:[ { id:"run_8k",    label:"Correr 8km",           xp:380, stat:"AGI" } ], bonusXP:170, gold:320 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"1h30 de imersão total. Conhecimento é poder.",             icon:"book-open",
+      tasks:[ { id:"study_1h30",label:"Estudar 1h30",         xp:300, stat:"INT" } ], bonusXP:160, gold:300 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"10 copos. O corpo de elite exige combustível de elite.",   icon:"moon",
+      tasks:[ { id:"water_10",  label:"Beber 10 copos de água",xp:170, stat:"VIT" } ], bonusXP:120, gold:240 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"25 minutos. A mente afiada como uma lâmina.",              icon:"eye",
+      tasks:[ { id:"med_25",    label:"Meditar 25 minutos",   xp:170, stat:"PER" } ], bonusXP:120, gold:240 },
+  ],
+  S: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"200 repetições. Apenas os lendários chegam aqui.",         icon:"zap",
+      tasks:[ { id:"push_200",  label:"200 Flexões",          xp:340, stat:"FOR" },
+              { id:"squat_150", label:"150 Agachamentos",     xp:300, stat:"FOR" } ], bonusXP:270, gold:500 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"10km diários. A resistência de um predador.",             icon:"activity",
+      tasks:[ { id:"run_10k",   label:"Correr 10km",          xp:480, stat:"AGI" } ], bonusXP:210, gold:400 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"2 horas de maestria. O sábio nunca para de aprender.",    icon:"book-open",
+      tasks:[ { id:"study_2h",  label:"Estudar 2 horas",      xp:380, stat:"INT" } ], bonusXP:200, gold:380 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"12 copos. O corpo Rank S não aceita menos.",              icon:"moon",
+      tasks:[ { id:"water_12",  label:"Beber 12 copos de água",xp:210, stat:"VIT" } ], bonusXP:150, gold:300 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"30 minutos de silêncio absoluto. Mente de mestre.",        icon:"eye",
+      tasks:[ { id:"med_30",    label:"Meditar 30 minutos",   xp:210, stat:"PER" } ], bonusXP:150, gold:300 },
+  ],
+  SS: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"250 repetições. Transcende o limite humano convencional.", icon:"zap",
+      tasks:[ { id:"push_250",  label:"250 Flexões",          xp:400, stat:"FOR" },
+              { id:"squat_200", label:"200 Agachamentos",     xp:360, stat:"FOR" } ], bonusXP:340, gold:620 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"15km. A velocidade do raio.",                             icon:"activity",
+      tasks:[ { id:"run_15k",   label:"Correr 15km",          xp:580, stat:"AGI" } ], bonusXP:260, gold:490 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"3 horas de concentração sobrenatural.",                   icon:"book-open",
+      tasks:[ { id:"study_3h",  label:"Estudar 3 horas",      xp:460, stat:"INT" } ], bonusXP:240, gold:460 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"14 copos. O corpo SS opera no limite da perfeição.",      icon:"moon",
+      tasks:[ { id:"water_14",  label:"Beber 14 copos de água",xp:250, stat:"VIT" } ], bonusXP:190, gold:370 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"40 minutos. Percepção além do normal.",                   icon:"eye",
+      tasks:[ { id:"med_40",    label:"Meditar 40 minutos",   xp:250, stat:"PER" } ], bonusXP:190, gold:370 },
+  ],
+  SSS: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"300 repetições. Um corpo forjado em outra dimensão.",     icon:"zap",
+      tasks:[ { id:"push_300",  label:"300 Flexões",          xp:460, stat:"FOR" },
+              { id:"squat_250", label:"250 Agachamentos",     xp:420, stat:"FOR" } ], bonusXP:400, gold:750 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"20km. A resistência de uma lenda viva.",                  icon:"activity",
+      tasks:[ { id:"run_20k",   label:"Correr 20km",          xp:680, stat:"AGI" } ], bonusXP:310, gold:580 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"4 horas de absorção absoluta de conhecimento.",           icon:"book-open",
+      tasks:[ { id:"study_4h",  label:"Estudar 4 horas",      xp:540, stat:"INT" } ], bonusXP:290, gold:550 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"16 copos. Vitalidade transcendente.",                     icon:"moon",
+      tasks:[ { id:"water_16",  label:"Beber 16 copos de água",xp:300, stat:"VIT" } ], bonusXP:230, gold:450 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"50 minutos. A mente que vê além do véu.",                 icon:"eye",
+      tasks:[ { id:"med_50",    label:"Meditar 50 minutos",   xp:300, stat:"PER" } ], bonusXP:230, gold:450 },
+  ],
+  Nacional: [
+    { id:"force",    category:"Força",        title:"Regime de Força",       desc:"400 repetições. O pico absoluto da humanidade.",          icon:"zap",
+      tasks:[ { id:"push_400",  label:"400 Flexões",          xp:550, stat:"FOR" },
+              { id:"squat_300", label:"300 Agachamentos",     xp:500, stat:"FOR" } ], bonusXP:500, gold:950 },
+    { id:"cardio",   category:"Agilidade",    title:"Protocolo Cardio",      desc:"25km. Uma lenda que corre além do horizonte.",            icon:"activity",
+      tasks:[ { id:"run_25k",   label:"Correr 25km",          xp:800, stat:"AGI" } ], bonusXP:380, gold:720 },
+    { id:"study",    category:"Inteligência", title:"Sessão de Estudos",     desc:"5 horas de iluminação. Um sábio entre sábios.",           icon:"book-open",
+      tasks:[ { id:"study_5h",  label:"Estudar 5 horas",      xp:650, stat:"INT" } ], bonusXP:360, gold:680 },
+    { id:"wellness", category:"Vitalidade",   title:"Protocolo de Bem-Estar",desc:"18 copos. O corpo Nacional é uma obra de arte.",         icon:"moon",
+      tasks:[ { id:"water_18",  label:"Beber 18 copos de água",xp:360, stat:"VIT" } ], bonusXP:280, gold:540 },
+    { id:"mind",     category:"Percepção",    title:"Clareza Mental",        desc:"60 minutos. A mente de um campeão nacional.",             icon:"eye",
+      tasks:[ { id:"med_60",    label:"Meditar 60 minutos",   xp:360, stat:"PER" } ], bonusXP:280, gold:540 },
+  ],
+};
+
+function getQuestsForRank(rank) {
+  return RANK_QUESTS[rank] || RANK_QUESTS.E;
+}
+
+// Mapa global de todos os tasks para lookup de XP (usado em getMonthXP)
+const ALL_TASKS_MAP = {};
+Object.values(RANK_QUESTS).forEach(quests =>
+  quests.forEach(q => q.tasks.forEach(t => { ALL_TASKS_MAP[t.id] = t; }))
+);
+
+// Mantido para compatibilidade — equivale às missões do Rank E
+const DAILY_QUESTS = RANK_QUESTS.E;
 
 const ACHIEVEMENTS = [
   { id: "first_task",     name: "Primeiro Passo",       desc: "Complete sua primeira tarefa.",              icon: "check",        grade: "Comum",   xp: 100  },

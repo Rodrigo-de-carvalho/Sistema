@@ -107,7 +107,7 @@ function App() {
   // ── Checar conquistas quando perfil ou log mudam ─────────────
   useEffect(() => {
     if (!profile) return;
-    const newly = checkNewAchievements(profile, questLog);
+    const newly = checkNewAchievements(profile, questLog, currentQuests);
     if (newly.length === 0) return;
     const bonusXP    = newly.reduce((s, a) => s + a.xp, 0);
     const newAchIds  = newly.map(a => a.id);
@@ -128,7 +128,8 @@ function App() {
 
     newly.forEach(a => addAlert(`Conquista: ${a.name}`, `+${a.xp} XP · ${a.grade}`, "success"));
   }, [profile?.achievements?.length, profile?.streak, profile?.level,
-      profile?.stats?.FOR, profile?.stats?.INT, JSON.stringify(Object.keys(questLog))]);
+      profile?.stats?.FOR, profile?.stats?.INT, JSON.stringify(Object.keys(questLog)),
+      currentQuests]);
 
   // ── Verificar gate premium ───────────────────────────────────
   useEffect(() => {
@@ -274,8 +275,10 @@ function App() {
   }, []);
 
   // ── Weekly progress + XP perdido sem premium (memorizados) ──
-  const weeklyProgress = useMemo(() => getWeeklyProgress(questLog), [questLog]);
-  const xpLost         = useMemo(() => getPremiumXPLost(questLog),  [questLog]);
+  const trueRankMemo    = useMemo(() => profile ? getRankForLevel(profile.level) : "E", [profile?.level]);
+  const currentQuests   = useMemo(() => getQuestsForRank(trueRankMemo), [trueRankMemo]);
+  const weeklyProgress  = useMemo(() => getWeeklyProgress(questLog, currentQuests), [questLog, currentQuests]);
+  const xpLost          = useMemo(() => getPremiumXPLost(questLog), [questLog]);
 
   const isMobile = useIsMobile();
 
@@ -309,7 +312,8 @@ function App() {
                                   onNameEdit={handleNameEdit} />,
     skills:       <SkillsTab      profile={profile} />,
     quests:       <QuestsTab      questLog={questLog} onTaskToggle={handleTaskToggle} countdown={countdown}
-                                  isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)} />,
+                                  isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)}
+                                  quests={currentQuests} currentRank={dispRank} />,
     inventory:    <InventoryTab   profile={profile} />,
     achievements: <AchievementsTab profile={profile} />,
     social:       <SocialTab myId={session?.user?.id} myName={profile.name} />,

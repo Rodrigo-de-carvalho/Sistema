@@ -17,10 +17,30 @@ function getTimeToMidnight() {
 }
 
 // ── XP / Nível ───────────────────────────────────────────────────
+// Custo por nível: triplica a cada rank (E→D→C), depois dobra (B→A→S…)
+// Primeiros níveis dentro do rank custam ~60% da base, últimos ~140%
+function xpForLevel(level) {
+  const tiers = [
+    { min:1,   max:5,   base:500    }, // E
+    { min:6,   max:15,  base:1500   }, // D  (3×)
+    { min:16,  max:30,  base:4500   }, // C  (3×)
+    { min:31,  max:50,  base:9000   }, // B  (2×)
+    { min:51,  max:80,  base:18000  }, // A  (2×)
+    { min:81,  max:120, base:36000  }, // S  (2×)
+    { min:121, max:160, base:72000  }, // SS
+    { min:161, max:199, base:144000 }, // SSS
+  ];
+  const tier = tiers.find(t => level >= t.min && level <= t.max);
+  if (!tier) return 288000; // Nacional
+  const span = tier.max - tier.min;
+  const pos  = span === 0 ? 0 : (level - tier.min) / span; // 0..1
+  return Math.round(tier.base * (0.6 + 0.8 * pos));
+}
+
 function computeLevel(totalXP) {
   let level = 1, accum = 0;
   while (true) {
-    const req = level * 200;
+    const req = xpForLevel(level);
     if (totalXP < accum + req) return { level, xpInLevel: totalXP - accum, xpToNext: req };
     accum += req;
     level++;
@@ -49,8 +69,9 @@ function isTaskDone(questLog, questId, taskId, date) {
   return !!(day[questId] && day[questId][taskId]);
 }
 
-function isQuestComplete(questLog, questId, date) {
-  const quest = DAILY_QUESTS.find(q => q.id === questId);
+function isQuestComplete(questLog, questId, date, quests) {
+  const list  = quests || DAILY_QUESTS;
+  const quest = list.find(q => q.id === questId);
   if (!quest) return false;
   return quest.tasks.every(t => isTaskDone(questLog, questId, t.id, date));
 }
@@ -61,16 +82,18 @@ function countTotalTasks(questLog) {
       s2 + Object.values(q).filter(Boolean).length, 0), 0);
 }
 
-function allQuestsDoneToday(questLog) {
-  return DAILY_QUESTS.every(q => isQuestComplete(questLog, q.id, todayKey()));
+function allQuestsDoneToday(questLog, quests) {
+  const list = quests || DAILY_QUESTS;
+  return list.every(q => isQuestComplete(questLog, q.id, todayKey(), list));
 }
 
-function getWeeklyProgress(questLog) {
+function getWeeklyProgress(questLog, quests) {
+  const list = quests || DAILY_QUESTS;
   return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10);
     const day  = questLog[date] || {};
     const done = Object.values(day).reduce((s, q) => s + Object.values(q).filter(Boolean).length, 0);
-    const max  = DAILY_QUESTS.reduce((s, q) => s + q.tasks.length, 0);
+    const max  = list.reduce((s, q) => s + q.tasks.length, 0);
     return { date, done, max, pct: Math.round((done / max) * 100) };
   });
 }
@@ -85,12 +108,13 @@ function computeStreak(lastActive, currentStreak) {
 }
 
 // ── Conquistas ───────────────────────────────────────────────────
-function checkNewAchievements(profile, questLog) {
+function checkNewAchievements(profile, questLog, quests) {
+  const list   = quests || DAILY_QUESTS;
   const total  = countTotalTasks(questLog);
   const rank   = getRankForLevel(profile.level);
   const checks = {
     first_task:     total >= 1,
-    first_quest:    DAILY_QUESTS.some(q => isQuestComplete(questLog, q.id)),
+    first_quest:    list.some(q => isQuestComplete(questLog, q.id, null, list)),
     streak_3:       profile.streak >= 3,
     streak_7:       profile.streak >= 7,
     streak_30:      profile.streak >= 30,
@@ -100,7 +124,7 @@ function checkNewAchievements(profile, questLog) {
     rank_c:         ["C","B","A","S","SS","SSS","Nacional"].includes(rank),
     str_30:         profile.stats.FOR >= 30,
     int_30:         profile.stats.INT >= 30,
-    all_quests_day: allQuestsDoneToday(questLog),
+    all_quests_day: allQuestsDoneToday(questLog, list),
     tasks_50:       total >= 50,
     tasks_100:      total >= 100,
   };
@@ -189,7 +213,7 @@ function getMonthXP(questLog) {
         return s + Object.entries(qLog)
           .filter(([, done]) => done)
           .reduce((s2, [taskId]) => {
-            const task = DAILY_QUESTS.flatMap(q => q.tasks).find(t => t.id === taskId);
+            const task = ALL_TASKS_MAP[taskId];
             return s2 + (task ? task.xp : 0);
           }, 0);
       }, 0);
