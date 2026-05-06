@@ -32,62 +32,347 @@ const STAT_META = [
   { key: "RES", label: "Resistência",  color: "#00ff88", desc: "Consistência de streak" },
 ];
 
-const DAILY_QUESTS = [
-  {
-    id: "force", category: "Força", title: "Regime de Força",
-    desc: "Fortaleça seu corpo. Cada repetição constrói disciplina.",
-    icon: "zap",
-    tasks: [
-      { id: "push_ups", label: "100 Flexões",       xp: 150, stat: "FOR" },
-      { id: "squats",   label: "100 Agachamentos",  xp: 150, stat: "FOR" },
-      { id: "abs",      label: "100 Abdominais",    xp: 100, stat: "VIT" },
-    ],
-    bonusXP: 100, gold: 200,
-  },
-  {
-    id: "cardio", category: "Agilidade", title: "Protocolo Cardio",
-    desc: "Melhore sua resistência cardiovascular com movimento.",
-    icon: "activity",
-    tasks: [
-      { id: "run_5km", label: "Correr 5km",         xp: 250, stat: "AGI" },
-      { id: "stretch", label: "Alongamento 15min",  xp: 100, stat: "AGI" },
-    ],
-    bonusXP: 100, gold: 175,
-  },
-  {
-    id: "study", category: "Inteligência", title: "Sessão de Estudos",
-    desc: "Invista em conhecimento. A mente é sua arma mais poderosa.",
-    icon: "book-open",
-    tasks: [
-      { id: "study_1h",    label: "Estudar 1 hora",            xp: 200, stat: "INT" },
-      { id: "read_30min",  label: "Ler por 30 minutos",        xp: 150, stat: "PER" },
-      { id: "practice",    label: "Praticar uma habilidade",   xp: 150, stat: "INT" },
-    ],
-    bonusXP: 150, gold: 225,
-  },
-  {
-    id: "wellness", category: "Vitalidade", title: "Protocolo de Bem-Estar",
-    desc: "Cuide do seu corpo. É o único que você tem.",
-    icon: "moon",
-    tasks: [
-      { id: "water_2l",  label: "Beber 2L de água",   xp: 100, stat: "VIT" },
-      { id: "sleep_8h",  label: "Dormir 8 horas",     xp: 200, stat: "VIT" },
-      { id: "eat_clean", label: "Alimentação limpa",  xp: 100, stat: "VIT" },
-    ],
-    bonusXP: 100, gold: 200,
-  },
-  {
-    id: "mind", category: "Percepção", title: "Clareza Mental",
-    desc: "Treine sua mente. Percepção aguçada é poder real.",
-    icon: "eye",
-    tasks: [
-      { id: "meditate", label: "Meditar 15 minutos",  xp: 150, stat: "PER" },
-      { id: "journal",  label: "Escrever no diário",  xp: 100, stat: "PER" },
-      { id: "no_phone", label: "1h sem telas",        xp: 150, stat: "RES" },
-    ],
-    bonusXP: 100, gold: 175,
-  },
-];
+// ── Missões diárias por rank ──────────────────────────────────────
+// Task IDs são fixos em todos os ranks para preservar o histório do questLog.
+// Labels e XP mudam por rank para escalar a dificuldade.
+const RANK_QUESTS = {
+  E: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"10 Flexões",          xp:50,  stat:"FOR" },
+        { id:"squats",   label:"15 Agachamentos",     xp:50,  stat:"FOR" },
+        { id:"abs",      label:"10 Abdominais",       xp:30,  stat:"VIT" },
+      ], bonusXP:30, gold:60 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Caminhar 1km",        xp:50,  stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 5min",    xp:30,  stat:"AGI" },
+      ], bonusXP:30, gold:50 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 15 minutos",       xp:60,  stat:"INT" },
+        { id:"read_30min", label:"Ler por 10 minutos",       xp:50,  stat:"PER" },
+        { id:"practice",   label:"Praticar uma habilidade",  xp:40,  stat:"INT" },
+      ], bonusXP:50, gold:65 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 2 copos d'água", xp:30, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 7 horas",       xp:60, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",    xp:40, stat:"VIT" },
+      ], bonusXP:40, gold:55 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 5 minutos",  xp:50, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:30, stat:"PER" },
+        { id:"no_phone", label:"30min sem telas",    xp:40, stat:"RES" },
+      ], bonusXP:40, gold:50 },
+  ],
+  D: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"25 Flexões",          xp:80,  stat:"FOR" },
+        { id:"squats",   label:"30 Agachamentos",     xp:80,  stat:"FOR" },
+        { id:"abs",      label:"25 Abdominais",       xp:50,  stat:"VIT" },
+      ], bonusXP:50, gold:100 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 2km",          xp:100, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 10min",   xp:50,  stat:"AGI" },
+      ], bonusXP:60, gold:90 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 30 minutos",       xp:100, stat:"INT" },
+        { id:"read_30min", label:"Ler por 20 minutos",       xp:80,  stat:"PER" },
+        { id:"practice",   label:"Praticar uma habilidade",  xp:60,  stat:"INT" },
+      ], bonusXP:80, gold:110 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 4 copos d'água", xp:50, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 7,5 horas",     xp:90, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",    xp:60, stat:"VIT" },
+      ], bonusXP:60, gold:90 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 10 minutos", xp:80, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:50, stat:"PER" },
+        { id:"no_phone", label:"45min sem telas",    xp:60, stat:"RES" },
+      ], bonusXP:60, gold:90 },
+  ],
+  C: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"50 Flexões",          xp:120, stat:"FOR" },
+        { id:"squats",   label:"50 Agachamentos",     xp:120, stat:"FOR" },
+        { id:"abs",      label:"50 Abdominais",       xp:80,  stat:"VIT" },
+      ], bonusXP:80, gold:160 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 3km",          xp:150, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 15min",   xp:80,  stat:"AGI" },
+      ], bonusXP:90, gold:140 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 45 minutos",       xp:150, stat:"INT" },
+        { id:"read_30min", label:"Ler por 30 minutos",       xp:120, stat:"PER" },
+        { id:"practice",   label:"Praticar uma habilidade",  xp:90,  stat:"INT" },
+      ], bonusXP:120, gold:170 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 6 copos d'água", xp:80,  stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 8 horas",       xp:120, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",    xp:90,  stat:"VIT" },
+      ], bonusXP:90, gold:145 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 15 minutos", xp:120, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:80,  stat:"PER" },
+        { id:"no_phone", label:"1h sem telas",       xp:90,  stat:"RES" },
+      ], bonusXP:90, gold:140 },
+  ],
+  B: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"100 Flexões",         xp:150, stat:"FOR" },
+        { id:"squats",   label:"80 Agachamentos",     xp:150, stat:"FOR" },
+        { id:"abs",      label:"80 Abdominais",       xp:100, stat:"VIT" },
+      ], bonusXP:100, gold:200 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 5km",          xp:250, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 20min",   xp:100, stat:"AGI" },
+      ], bonusXP:120, gold:185 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 1 hora",            xp:200, stat:"INT" },
+        { id:"read_30min", label:"Ler por 30 minutos",        xp:150, stat:"PER" },
+        { id:"practice",   label:"Praticar uma habilidade",   xp:150, stat:"INT" },
+      ], bonusXP:150, gold:225 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 8 copos d'água", xp:100, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 8 horas",       xp:200, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",    xp:100, stat:"VIT" },
+      ], bonusXP:100, gold:200 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 15 minutos", xp:150, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:100, stat:"PER" },
+        { id:"no_phone", label:"1h sem telas",       xp:150, stat:"RES" },
+      ], bonusXP:100, gold:175 },
+  ],
+  A: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"150 Flexões",         xp:200, stat:"FOR" },
+        { id:"squats",   label:"120 Agachamentos",    xp:200, stat:"FOR" },
+        { id:"abs",      label:"100 Abdominais",      xp:140, stat:"VIT" },
+      ], bonusXP:150, gold:270 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 8km",          xp:350, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 20min",   xp:130, stat:"AGI" },
+      ], bonusXP:160, gold:245 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 1h30",              xp:300, stat:"INT" },
+        { id:"read_30min", label:"Ler por 45 minutos",        xp:200, stat:"PER" },
+        { id:"practice",   label:"Praticar uma habilidade",   xp:200, stat:"INT" },
+      ], bonusXP:200, gold:310 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 10 copos d'água", xp:140, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 8 horas",        xp:250, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",     xp:130, stat:"VIT" },
+      ], bonusXP:150, gold:260 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 20 minutos", xp:200, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:130, stat:"PER" },
+        { id:"no_phone", label:"1h sem telas",       xp:200, stat:"RES" },
+      ], bonusXP:150, gold:240 },
+  ],
+  S: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"200 Flexões",         xp:250, stat:"FOR" },
+        { id:"squats",   label:"150 Agachamentos",    xp:250, stat:"FOR" },
+        { id:"abs",      label:"150 Abdominais",      xp:180, stat:"VIT" },
+      ], bonusXP:200, gold:350 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 10km",         xp:450, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 30min",   xp:160, stat:"AGI" },
+      ], bonusXP:200, gold:305 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 2 horas",           xp:400, stat:"INT" },
+        { id:"read_30min", label:"Ler por 1 hora",            xp:250, stat:"PER" },
+        { id:"practice",   label:"Praticar uma habilidade",   xp:250, stat:"INT" },
+      ], bonusXP:250, gold:395 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 12 copos d'água", xp:180, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 8 horas",        xp:280, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",     xp:160, stat:"VIT" },
+      ], bonusXP:200, gold:310 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 30 minutos", xp:250, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:160, stat:"PER" },
+        { id:"no_phone", label:"1h sem telas",       xp:250, stat:"RES" },
+      ], bonusXP:200, gold:300 },
+  ],
+  SS: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"250 Flexões",         xp:350, stat:"FOR" },
+        { id:"squats",   label:"200 Agachamentos",    xp:320, stat:"FOR" },
+        { id:"abs",      label:"200 Abdominais",      xp:250, stat:"VIT" },
+      ], bonusXP:280, gold:450 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 12km",         xp:600, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 30min",   xp:200, stat:"AGI" },
+      ], bonusXP:280, gold:400 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 2h30",              xp:550, stat:"INT" },
+        { id:"read_30min", label:"Ler por 1 hora",            xp:350, stat:"PER" },
+        { id:"practice",   label:"Praticar 2 habilidades",    xp:350, stat:"INT" },
+      ], bonusXP:350, gold:540 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 14 copos d'água", xp:250, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 8 horas",        xp:350, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",     xp:200, stat:"VIT" },
+      ], bonusXP:280, gold:420 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 30 minutos", xp:350, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:200, stat:"PER" },
+        { id:"no_phone", label:"2h sem telas",       xp:350, stat:"RES" },
+      ], bonusXP:280, gold:400 },
+  ],
+  SSS: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"300 Flexões",         xp:450, stat:"FOR" },
+        { id:"squats",   label:"250 Agachamentos",    xp:400, stat:"FOR" },
+        { id:"abs",      label:"250 Abdominais",      xp:320, stat:"VIT" },
+      ], bonusXP:380, gold:565 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 15km",         xp:800, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 30min",   xp:250, stat:"AGI" },
+      ], bonusXP:380, gold:520 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 3 horas",           xp:700, stat:"INT" },
+        { id:"read_30min", label:"Ler por 1h30",              xp:450, stat:"PER" },
+        { id:"practice",   label:"Praticar 2 habilidades",    xp:450, stat:"INT" },
+      ], bonusXP:480, gold:720 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 16 copos d'água", xp:320, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 8 horas",        xp:400, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",     xp:250, stat:"VIT" },
+      ], bonusXP:380, gold:540 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 45 minutos", xp:450, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário", xp:250, stat:"PER" },
+        { id:"no_phone", label:"2h sem telas",       xp:450, stat:"RES" },
+      ], bonusXP:380, gold:510 },
+  ],
+  Nacional: [
+    { id:"force", category:"Força", title:"Regime de Força",
+      desc:"Fortaleça seu corpo. Cada repetição constrói disciplina.", icon:"zap",
+      tasks:[
+        { id:"push_ups", label:"500 Flexões",         xp:700, stat:"FOR" },
+        { id:"squats",   label:"400 Agachamentos",    xp:600, stat:"FOR" },
+        { id:"abs",      label:"400 Abdominais",      xp:500, stat:"VIT" },
+      ], bonusXP:600, gold:900 },
+    { id:"cardio", category:"Agilidade", title:"Protocolo Cardio",
+      desc:"Melhore sua resistência cardiovascular com movimento.", icon:"activity",
+      tasks:[
+        { id:"run_5km",  label:"Correr 20km",         xp:1200, stat:"AGI" },
+        { id:"stretch",  label:"Alongamento 30min",   xp:350,  stat:"AGI" },
+      ], bonusXP:600, gold:790 },
+    { id:"study", category:"Inteligência", title:"Sessão de Estudos",
+      desc:"Invista em conhecimento. A mente é sua arma mais poderosa.", icon:"book-open",
+      tasks:[
+        { id:"study_1h",   label:"Estudar 4 horas",           xp:1000, stat:"INT" },
+        { id:"read_30min", label:"Ler por 2 horas",           xp:700,  stat:"PER" },
+        { id:"practice",   label:"Praticar 3 habilidades",    xp:700,  stat:"INT" },
+      ], bonusXP:750, gold:1100 },
+    { id:"wellness", category:"Vitalidade", title:"Protocolo de Bem-Estar",
+      desc:"Cuide do seu corpo. É o único que você tem.", icon:"moon",
+      tasks:[
+        { id:"water_2l",  label:"Beber 20 copos d'água", xp:500, stat:"VIT" },
+        { id:"sleep_8h",  label:"Dormir 8 horas",        xp:600, stat:"VIT" },
+        { id:"eat_clean", label:"Alimentação limpa",     xp:350, stat:"VIT" },
+      ], bonusXP:600, gold:825 },
+    { id:"mind", category:"Percepção", title:"Clareza Mental",
+      desc:"Treine sua mente. Percepção aguçada é poder real.", icon:"eye",
+      tasks:[
+        { id:"meditate", label:"Meditar 1 hora",    xp:700, stat:"PER" },
+        { id:"journal",  label:"Escrever no diário",xp:350, stat:"PER" },
+        { id:"no_phone", label:"3h sem telas",      xp:700, stat:"RES" },
+      ], bonusXP:600, gold:795 },
+  ],
+};
+
+function getQuestsForRank(rank) {
+  return RANK_QUESTS[rank] || RANK_QUESTS.B;
+}
+
+// Mapa de todas as tasks por ID (usa Rank E como baseline para fallback legacy)
+const ALL_TASKS_MAP = Object.values(RANK_QUESTS)
+  .flatMap(qs => qs.flatMap(q => q.tasks))
+  .reduce((m, t) => { if (!m[t.id]) m[t.id] = t; return m; }, {});
+
+// Alias backward-compat: Rank B corresponde ao nível original das missões
+const DAILY_QUESTS = RANK_QUESTS.B;
 
 const ACHIEVEMENTS = [
   { id: "first_task",     name: "Primeiro Passo",       desc: "Complete sua primeira tarefa.",              icon: "check",        grade: "Comum",   xp: 100  },

@@ -26,12 +26,22 @@ function App() {
   const [showPremium,     setShowPremium]      = useState(false);
   const [syncTimer,       setSyncTimer]        = useState(null);
   const [showPassReset,   setShowPassReset]    = useState(false);
+  // Missões: lista fixa do dia (calculada uma vez no load) e registro de XP concedido
+  const [dailyQuests,     setDailyQuests]      = useState(null);
+  const [missionsGranted, setMissionsGranted]  = useState(() => loadMissionsGranted());
+  const dailyQuestsSetRef = React.useRef(false);
 
-  // ── Relógio + countdown ──────────────────────────────────────
+  // ── Relógio + countdown + reset de missões à meia-noite ─────
   useEffect(() => {
     const tick = () => {
       setClock(new Date().toTimeString().slice(0, 8));
       setCountdown(getTimeToMidnight());
+      // Reseta registro de XP concedido quando a data muda
+      setMissionsGranted(prev => {
+        const today = todayKey();
+        if (prev.date !== today) return { date: today, granted: [] };
+        return prev;
+      });
     };
     tick();
     const iv = setInterval(tick, 1000);
@@ -56,6 +66,13 @@ function App() {
 
   // ── Carregamento inicial ─────────────────────────────────────
   useEffect(() => {
+    const initDailyQuests = (p) => {
+      if (!dailyQuestsSetRef.current) {
+        setDailyQuests(getQuestsForRank(getRankForLevel(p.level)));
+        dailyQuestsSetRef.current = true;
+      }
+    };
+
     (async () => {
       // 1. Carrega do localStorage
       const cached = loadProfile();
@@ -64,6 +81,7 @@ function App() {
         const { profile: p2, shieldUsed: su1 } = checkStreakShield(p);
         setProfile(p2);
         setQuestLog(p2.quest_log || {});
+        initDailyQuests(p2);
         if (su1) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
       }
 
@@ -78,6 +96,7 @@ function App() {
             const { profile: p2, shieldUsed: su2 } = checkStreakShield(p);
             setProfile(p2);
             setQuestLog(p2.quest_log || {});
+            initDailyQuests(p2);
             saveProfile(p2);
             if (su2) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
           } else if (!cached) {
@@ -140,6 +159,9 @@ function App() {
     }
   }, [profile?.level]);
 
+  // ── Persistência de missionsGranted ─────────────────────────
+  useEffect(() => { saveMissionsGranted(missionsGranted); }, [missionsGranted]);
+
   // ── Persistência automática ──────────────────────────────────
   useEffect(() => {
     if (!profile) return;
@@ -168,30 +190,53 @@ function App() {
     const today = todayKey();
     const yest  = yesterdayKey();
 
-    // Read current state from questLog closure — profile.quest_log is stale
+    // Garante registro válido para hoje (proteção contra app aberto à meia-noite)
+    const currentGranted = missionsGranted.date === today ? missionsGranted : { date: today, granted: [] };
+
+    // Estado atual da task no questLog (closure atual, não stale)
     const rawVal    = (questLog[today]?.[questId] || {})[taskId];
     const isDone    = !!rawVal;
-    // Support legacy `true` values; store numeric XP when checking
-    const grantedXP = typeof rawVal === 'number' ? rawVal : (isDone ? taskXP : 0);
-    const effectiveXP = !isDone
+    // XP que foi armazenado quando a task foi marcada (para subtração exata)
+    const storedXP  = typeof rawVal === "number" ? rawVal : 0;
+    // Task já concedeu XP hoje?
+    const alreadyGranted = currentGranted.granted.includes(taskId);
+
+    // XP efetivo a conceder: só se marcando E ainda não concedeu
+    const effectiveXP = (!isDone && !alreadyGranted)
       ? (profile?.is_premium ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP)
       : 0;
 
+    // Atualiza questLog: armazena número (XP) ao marcar, false ao desmarcar
     setQuestLog(prev => {
       const d = prev[today] || {};
       const q = d[questId] || {};
-      return { ...prev, [today]: { ...d, [questId]: { ...q, [taskId]: isDone ? false : effectiveXP } } };
+      return { ...prev, [today]: { ...d, [questId]: { ...q, [taskId]: isDone ? false : effectiveXP || true } } };
     });
 
+    // Atualiza registro de missões concedidas
+    setMissionsGranted(prev => {
+      const base = prev.date === today ? prev : { date: today, granted: [] };
+      if (!isDone && !alreadyGranted) {
+        return { date: today, granted: [...base.granted, taskId] };
+      }
+      if (isDone) {
+        return { date: today, granted: base.granted.filter(id => id !== taskId) };
+      }
+      return base;
+    });
+
+    // Atualiza perfil
     setProfile(prev => {
       if (!prev) return prev;
-      const xpDelta   = isDone ? -grantedXP : effectiveXP;
+      const xpDelta   = isDone ? -storedXP : effectiveXP;
       const statDelta = isDone ? -1 : 1;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
       const newXP     = Math.max(0, prev.xp + xpDelta);
-      const { level } = computeLevel(newXP);
+      // Nível nunca reverte ao desmarcar — apenas avança ao marcar
+      const computedLevel = computeLevel(newXP).level;
+      const newLevel  = isDone ? Math.max(prev.level, computedLevel) : computedLevel;
 
-      // Streak only advances on check, not uncheck
+      // Streak só avança ao marcar
       let newStreak     = prev.streak;
       let newLastActive = prev.last_active;
       if (!isDone && prev.last_active !== today) {
@@ -199,22 +244,22 @@ function App() {
         newLastActive = today;
       }
 
-      const goldDelta = isDone ? -Math.floor(grantedXP / 5) : Math.floor(taskXP / 5);
+      const goldDelta = isDone ? -Math.floor(storedXP / 5) : Math.floor(taskXP / 5);
 
       return {
         ...prev,
         xp:          newXP,
-        level,
+        level:       newLevel,
         stats:       { ...prev.stats, [taskStat]: Math.min(100, newStat) },
         streak:      newStreak,
         last_active: newLastActive,
         gold:        Math.max(0, prev.gold + goldDelta),
         stat_points: prev.is_premium
-          ? prev.stat_points + (computeLevel(newXP).level > prev.level ? 3 : 0)
+          ? prev.stat_points + (newLevel > prev.level ? 3 : 0)
           : 0,
       };
     });
-  }, [questLog, profile?.is_premium]);
+  }, [questLog, missionsGranted, profile?.is_premium]);
 
   // ── Distribuir ponto de atributo ─────────────────────────────
   const handleStatPoint = useCallback((statKey) => {
@@ -265,6 +310,9 @@ function App() {
   const handleProfileSave = useCallback(async (newProfile) => {
     setProfile(newProfile);
     setQuestLog({});
+    setMissionsGranted({ date: todayKey(), granted: [] });
+    setDailyQuests(getQuestsForRank(getRankForLevel(newProfile.level)));
+    dailyQuestsSetRef.current = true;
     saveProfile(newProfile);
     if (session) await syncToSupabase(newProfile, session.user.id);
     setNeedsSetup(false);
@@ -274,7 +322,11 @@ function App() {
   const handleLogout = useCallback(async () => {
     if (window.sb) await window.sb.auth.signOut();
     localStorage.removeItem("sistema_profile");
+    localStorage.removeItem("sistema_missions_xp");
     setProfile(null); setQuestLog({}); setSession(null);
+    setMissionsGranted({ date: todayKey(), granted: [] });
+    dailyQuestsSetRef.current = false;
+    setDailyQuests(null);
     setShowAuth(!!window.SUPABASE_OK);
     if (!window.SUPABASE_OK) setNeedsSetup(true);
   }, []);
@@ -315,7 +367,8 @@ function App() {
                                   onNameEdit={handleNameEdit} />,
     skills:       <SkillsTab      profile={profile} />,
     quests:       <QuestsTab      questLog={questLog} onTaskToggle={handleTaskToggle} countdown={countdown}
-                                  isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)} />,
+                                  isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)}
+                                  quests={dailyQuests || DAILY_QUESTS} currentRank={trueRank} />,
     inventory:    <InventoryTab   profile={profile} />,
     achievements: <AchievementsTab profile={profile} />,
     social:       <SocialTab myId={session?.user?.id} myName={profile.name} />,

@@ -490,16 +490,29 @@ function SkillsTab({ profile }) {
 }
 
 // ── MISSÕES ───────────────────────────────────────────────────────
-function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium }) {
+function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium, quests, currentRank }) {
   const [filter, setFilter] = React.useState("Todas");
   const today    = todayKey();
+  const list     = quests || DAILY_QUESTS;
   const catColors = { "Força":"#ff6644","Agilidade":"#00d4ff","Inteligência":"#9b5de5","Vitalidade":"#ff4466","Percepção":"#ffd700" };
-  const filters  = ["Todas", ...DAILY_QUESTS.map(q => q.category)];
-  const shown    = filter === "Todas" ? DAILY_QUESTS : DAILY_QUESTS.filter(q => q.category === filter);
+  const filters  = ["Todas", ...list.map(q => q.category)];
+  const shown    = filter === "Todas" ? list : list.filter(q => q.category === filter);
 
   return (
-    <div style={{ animation:"appear-up 0.4s ease" }}>
-      {/* Header com timer */}
+    <div style={{ animation:"appear-up 0.15s ease" }}>
+      {/* Badge do rank atual */}
+      {currentRank && (
+        <div style={{ marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{
+            background: `${RANK_COLORS[currentRank] || "#4f8cff"}18`,
+            border: `1px solid ${RANK_COLORS[currentRank] || "#4f8cff"}44`,
+            color: RANK_COLORS[currentRank] || "#4f8cff",
+            fontSize:9, padding:"3px 10px",
+            fontFamily:"var(--font-title)", letterSpacing:1.5, borderRadius:2,
+          }}>MISSÕES RANK {currentRank} — escaladas para seu nível atual</span>
+        </div>
+      )}
+      {/* Header com filtros + timer */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
           {filters.map(f => (

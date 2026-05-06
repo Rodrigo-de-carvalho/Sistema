@@ -1,6 +1,7 @@
 // ── logic.js — funções de jogo e storage ─────────────────────────
 
-const LS_KEY = "sistema_profile";
+const LS_KEY         = "sistema_profile";
+const LS_KEY_MISSIONS = "sistema_missions_xp";
 
 // ── Datas ────────────────────────────────────────────────────────
 const todayKey     = () => new Date().toISOString().slice(0, 10);
@@ -107,6 +108,24 @@ function checkNewAchievements(profile, questLog) {
   return ACHIEVEMENTS.filter(a => checks[a.id] && !profile.achievements.includes(a.id));
 }
 
+// ── Missions XP Granted ──────────────────────────────────────────
+// Rastreia quais tasks já concederam XP hoje para evitar duplicação.
+// Reseta automaticamente se a data mudou.
+function loadMissionsGranted() {
+  const today = todayKey();
+  try {
+    const raw  = localStorage.getItem(LS_KEY_MISSIONS);
+    if (!raw) return { date: today, granted: [] };
+    const data = JSON.parse(raw);
+    if (data.date !== today) return { date: today, granted: [] };
+    return { date: data.date, granted: Array.isArray(data.granted) ? data.granted : [] };
+  } catch { return { date: today, granted: [] }; }
+}
+
+function saveMissionsGranted(record) {
+  try { localStorage.setItem(LS_KEY_MISSIONS, JSON.stringify(record)); } catch {}
+}
+
 // ── Storage ──────────────────────────────────────────────────────
 function loadProfile() {
   try {
@@ -180,18 +199,18 @@ function pruneQuestLog(questLog) {
 // ── Freemium helpers ─────────────────────────────────────────────
 
 // XP ganho neste mês (para calcular o bônus perdido)
+// Lê o valor numérico armazenado na task (novo formato) ou 0 para legados.
 function getMonthXP(questLog) {
   const month = new Date().toISOString().slice(0, 7);
   return Object.entries(questLog)
     .filter(([date]) => date.startsWith(month))
     .reduce((sum, [, dayLog]) => {
       return sum + Object.values(dayLog).reduce((s, qLog) => {
-        return s + Object.entries(qLog)
-          .filter(([, done]) => done)
-          .reduce((s2, [taskId]) => {
-            const task = DAILY_QUESTS.flatMap(q => q.tasks).find(t => t.id === taskId);
-            return s2 + (task ? task.xp : 0);
-          }, 0);
+        return s + Object.values(qLog).reduce((s2, val) => {
+          if (!val) return s2;
+          if (typeof val === "number") return s2 + val;
+          return s2; // legado `true` — XP desconhecido, ignora
+        }, 0);
       }, 0);
     }, 0);
 }
