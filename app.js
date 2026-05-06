@@ -26,12 +26,29 @@ function App() {
   const [showPremium,     setShowPremium]      = useState(false);
   const [syncTimer,       setSyncTimer]        = useState(null);
   const [showPassReset,   setShowPassReset]    = useState(false);
+  // Missões: lista fixa do dia (calculada uma vez no load) e registro de XP concedido
+  const [dailyQuests,     setDailyQuests]      = useState(null);
+  const [missionsGranted, setMissionsGranted]  = useState(() => loadMissionsGranted());
+  const dailyQuestsSetRef    = React.useRef(false);
+  // Refs sempre atuais — imunes ao batching do React 18 em cliques rápidos
+  const questLogRef          = React.useRef({});
+  const missionsGrantedRef   = React.useRef(loadMissionsGranted());
 
-  // ── Relógio + countdown ──────────────────────────────────────
+  // Mantém refs em sincronia com o estado a cada render
+  questLogRef.current        = questLog;
+  missionsGrantedRef.current = missionsGranted;
+
+  // ── Relógio + countdown + reset de missões à meia-noite ─────
   useEffect(() => {
     const tick = () => {
       setClock(new Date().toTimeString().slice(0, 8));
       setCountdown(getTimeToMidnight());
+      // Reseta registro de XP concedido quando a data muda
+      setMissionsGranted(prev => {
+        const today = todayKey();
+        if (prev.date !== today) return { date: today, granted: [] };
+        return prev;
+      });
     };
     tick();
     const iv = setInterval(tick, 1000);
@@ -56,6 +73,13 @@ function App() {
 
   // ── Carregamento inicial ─────────────────────────────────────
   useEffect(() => {
+    const initDailyQuests = (p) => {
+      if (!dailyQuestsSetRef.current) {
+        setDailyQuests(getQuestsForRank(getRankForLevel(p.level)));
+        dailyQuestsSetRef.current = true;
+      }
+    };
+
     (async () => {
       // 1. Carrega do localStorage
       const cached = loadProfile();
@@ -64,6 +88,7 @@ function App() {
         const { profile: p2, shieldUsed: su1 } = checkStreakShield(p);
         setProfile(p2);
         setQuestLog(p2.quest_log || {});
+        initDailyQuests(p2);
         if (su1) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
       }
 
@@ -78,6 +103,7 @@ function App() {
             const { profile: p2, shieldUsed: su2 } = checkStreakShield(p);
             setProfile(p2);
             setQuestLog(p2.quest_log || {});
+            initDailyQuests(p2);
             saveProfile(p2);
             if (su2) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
           } else if (!cached) {
@@ -107,7 +133,7 @@ function App() {
   // ── Checar conquistas quando perfil ou log mudam ─────────────
   useEffect(() => {
     if (!profile) return;
-    const newly = checkNewAchievements(profile, questLog, currentQuests);
+    const newly = checkNewAchievements(profile, questLog);
     if (newly.length === 0) return;
     const bonusXP    = newly.reduce((s, a) => s + a.xp, 0);
     const newAchIds  = newly.map(a => a.id);
@@ -128,8 +154,7 @@ function App() {
 
     newly.forEach(a => addAlert(`Conquista: ${a.name}`, `+${a.xp} XP · ${a.grade}`, "success"));
   }, [profile?.achievements?.length, profile?.streak, profile?.level,
-      profile?.stats?.FOR, profile?.stats?.INT, JSON.stringify(Object.keys(questLog)),
-      currentQuests]);
+      profile?.stats?.FOR, profile?.stats?.INT, JSON.stringify(Object.keys(questLog))]);
 
   // ── Verificar gate premium ───────────────────────────────────
   useEffect(() => {
@@ -140,6 +165,9 @@ function App() {
       applyProfileUpdate({ premium_gate_shown: true });
     }
   }, [profile?.level]);
+
+  // ── Persistência de missionsGranted ─────────────────────────
+  useEffect(() => { saveMissionsGranted(missionsGranted); }, [missionsGranted]);
 
   // ── Persistência automática ──────────────────────────────────
   useEffect(() => {
@@ -166,50 +194,71 @@ function App() {
 
   // ── Completar / desmarcar tarefa ─────────────────────────────
   const handleTaskToggle = useCallback((questId, taskId, taskXP, taskStat) => {
-    const today  = todayKey();
-    const yest   = yesterdayKey();
+    const today = todayKey();
+    const yest  = yesterdayKey();
 
-    setQuestLog(prev => {
-      const dayLog  = prev[today] || {};
-      const qLog    = dayLog[questId] || {};
-      const isDone  = !!qLog[taskId];
-      const newQLog = { ...qLog, [taskId]: !isDone };
-      return { ...prev, [today]: { ...dayLog, [questId]: newQLog } };
-    });
+    // Lê dos REFS (sempre atuais) — não da closure, que pode estar stale
+    // quando React 18 agrupa eventos de clique rápidos no mesmo batch.
+    const ql = questLogRef.current;
+    const mg = missionsGrantedRef.current;
+
+    const rawVal         = (ql[today]?.[questId] || {})[taskId];
+    const isDone         = !!rawVal;
+    const storedXP       = typeof rawVal === "number" ? rawVal : 0;
+    const grantedList    = mg.date === today ? mg.granted : [];
+    const alreadyGranted = grantedList.includes(taskId);
+
+    const effectiveXP = (!isDone && !alreadyGranted)
+      ? (profile?.is_premium ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP)
+      : 0;
+
+    // Calcula novos valores
+    const newTaskVal  = isDone ? false : (effectiveXP || true);
+    const newDayLog   = { ...(ql[today] || {}), [questId]: { ...((ql[today]?.[questId]) || {}), [taskId]: newTaskVal } };
+    const newQL       = { ...ql, [today]: newDayLog };
+    const newGranted  = (!isDone && !alreadyGranted) ? [...grantedList, taskId] : grantedList;
+    const newMG       = { date: today, granted: newGranted };
+
+    // Atualiza refs IMEDIATAMENTE — cliques subsequentes antes do re-render
+    // já verão o estado correto sem esperar pelo setState ser processado.
+    questLogRef.current        = newQL;
+    missionsGrantedRef.current = newMG;
+
+    // Propaga para o estado React (causa o re-render)
+    setQuestLog(newQL);
+    setMissionsGranted(newMG);
 
     setProfile(prev => {
       if (!prev) return prev;
-      const isDone  = !!(prev.quest_log?.[today]?.[questId]?.[taskId]);
-      const delta   = isDone ? -1 : 1;
-      const effectiveXP = (!isDone && prev.is_premium) ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP;
-      const newStat = Math.max(10, (prev.stats[taskStat] || 10) + delta);
-      const newXP   = Math.max(0, prev.xp + delta * effectiveXP);
-      const { level } = computeLevel(newXP);
+      const newXP    = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
+      // Nível só sobe quando há XP real; qualquer outro caso protege contra regressão
+      const computed = computeLevel(newXP).level;
+      const newLevel = effectiveXP > 0 ? computed : Math.max(prev.level, computed);
+      // Stat e gold só mudam quando há movimento real de XP
+      const statDelta = effectiveXP > 0 ? 1 : (isDone && storedXP > 0) ? -1 : 0;
+      const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
+      const goldDelta = effectiveXP > 0
+        ? Math.floor(taskXP / 5)
+        : (isDone && storedXP > 0) ? -Math.floor(storedXP / 5) : 0;
 
-      // Streak (só conta ao marcar, não desmarcar)
-      let newStreak     = prev.streak;
-      let newLastActive = prev.last_active;
+      let newStreak = prev.streak, newLastActive = prev.last_active;
       if (!isDone && prev.last_active !== today) {
         newStreak     = prev.last_active === yest ? prev.streak + 1 : 1;
         newLastActive = today;
       }
 
-      const newGold = Math.max(0, prev.gold + delta * Math.floor(taskXP / 5));
-
       return {
         ...prev,
         xp:          newXP,
-        level,
+        level:       newLevel,
         stats:       { ...prev.stats, [taskStat]: Math.min(100, newStat) },
         streak:      newStreak,
         last_active: newLastActive,
-        gold:        newGold,
-        stat_points: prev.is_premium
-          ? prev.stat_points + (computeLevel(newXP).level > prev.level ? 3 : 0)
-          : 0,
+        gold:        Math.max(0, prev.gold + goldDelta),
+        stat_points: prev.stat_points, // não modifica aqui para evitar reset
       };
     });
-  }, []);
+  }, [profile?.is_premium]); // refs não precisam estar no dep array
 
   // ── Distribuir ponto de atributo ─────────────────────────────
   const handleStatPoint = useCallback((statKey) => {
@@ -258,8 +307,14 @@ function App() {
   }, []);
 
   const handleProfileSave = useCallback(async (newProfile) => {
+    const freshMG = { date: todayKey(), granted: [] };
     setProfile(newProfile);
     setQuestLog({});
+    setMissionsGranted(freshMG);
+    questLogRef.current        = {};
+    missionsGrantedRef.current = freshMG;
+    setDailyQuests(getQuestsForRank(getRankForLevel(newProfile.level)));
+    dailyQuestsSetRef.current  = true;
     saveProfile(newProfile);
     if (session) await syncToSupabase(newProfile, session.user.id);
     setNeedsSetup(false);
@@ -269,16 +324,21 @@ function App() {
   const handleLogout = useCallback(async () => {
     if (window.sb) await window.sb.auth.signOut();
     localStorage.removeItem("sistema_profile");
+    localStorage.removeItem("sistema_missions_xp");
+    const emptyMG = { date: todayKey(), granted: [] };
     setProfile(null); setQuestLog({}); setSession(null);
+    setMissionsGranted(emptyMG);
+    questLogRef.current        = {};
+    missionsGrantedRef.current = emptyMG;
+    dailyQuestsSetRef.current  = false;
+    setDailyQuests(null);
     setShowAuth(!!window.SUPABASE_OK);
     if (!window.SUPABASE_OK) setNeedsSetup(true);
   }, []);
 
   // ── Weekly progress + XP perdido sem premium (memorizados) ──
-  const trueRankMemo    = useMemo(() => profile ? getRankForLevel(profile.level) : "E", [profile?.level]);
-  const currentQuests   = useMemo(() => getQuestsForRank(trueRankMemo), [trueRankMemo]);
-  const weeklyProgress  = useMemo(() => getWeeklyProgress(questLog, currentQuests), [questLog, currentQuests]);
-  const xpLost          = useMemo(() => getPremiumXPLost(questLog), [questLog]);
+  const weeklyProgress = useMemo(() => getWeeklyProgress(questLog), [questLog]);
+  const xpLost         = useMemo(() => getPremiumXPLost(questLog),  [questLog]);
 
   const isMobile = useIsMobile();
 
@@ -313,7 +373,7 @@ function App() {
     skills:       <SkillsTab      profile={profile} />,
     quests:       <QuestsTab      questLog={questLog} onTaskToggle={handleTaskToggle} countdown={countdown}
                                   isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)}
-                                  quests={currentQuests} currentRank={dispRank} />,
+                                  quests={dailyQuests || DAILY_QUESTS} currentRank={trueRank} />,
     inventory:    <InventoryTab   profile={profile} />,
     achievements: <AchievementsTab profile={profile} />,
     social:       <SocialTab myId={session?.user?.id} myName={profile.name} />,
@@ -361,20 +421,16 @@ function App() {
           {!isMobile && (
             <div style={{ display:"flex", gap:2, flex:1 }}>
               {TABS_CFG.map(t => (
-                <button key={t.id}
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => setTab(t.id)}
-                  style={{
-                    display:"flex", alignItems:"center", gap:7,
-                    background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
-                    border:"none",
-                    boxShadow: tab===t.id?"inset 0 -2px 0 var(--blue-core)":"none",
-                    color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
-                    padding:"0 16px", height:52, cursor:"pointer",
-                    fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
-                    transition:"none", outline:"none",
-                    WebkitTapHighlightColor:"transparent",
-                  }}>
+                <button key={t.id} onClick={() => setTab(t.id)} style={{
+                  display:"flex", alignItems:"center", gap:7,
+                  background: tab===t.id?"rgba(79,140,255,0.12)":"transparent",
+                  border:"none", borderBottom:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                  color: tab===t.id?"var(--text-bright)":"var(--text-dim)",
+                  padding:"0 16px", height:52, cursor:"pointer",
+                  fontFamily:"var(--font-title)", fontSize:11, letterSpacing:1,
+                  transition:"background 0.15s, color 0.15s",
+                  WebkitTapHighlightColor:"transparent",
+                }}>
                   <Icon name={t.icon} size={14} color={tab===t.id?"var(--blue-core)":undefined} />
                   {t.label}
                 </button>
@@ -471,18 +527,15 @@ function App() {
             background:"rgba(3,3,12,0.97)", borderTop:"1px solid var(--border-dim)",
             display:"flex", zIndex:200, backdropFilter:"blur(8px)" }}>
             {TABS_CFG.map(t => (
-              <button key={t.id}
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => setTab(t.id)}
-                style={{
-                  flex:1, height:"100%", background:"transparent", border:"none",
-                  boxShadow: tab===t.id?"inset 0 2px 0 var(--blue-core)":"none",
-                  color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
-                  cursor:"pointer", display:"flex", flexDirection:"column",
-                  alignItems:"center", justifyContent:"center", gap:3,
-                  transition:"none", outline:"none",
-                  WebkitTapHighlightColor:"transparent",
-                }}>
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                flex:1, height:"100%", background:"transparent", border:"none",
+                borderTop:`2px solid ${tab===t.id?"var(--blue-core)":"transparent"}`,
+                color: tab===t.id ? "var(--blue-core)" : "var(--text-dim)",
+                cursor:"pointer", display:"flex", flexDirection:"column",
+                alignItems:"center", justifyContent:"center", gap:3,
+                transition:"background 0.15s, color 0.15s",
+                WebkitTapHighlightColor:"transparent",
+              }}>
                 <Icon name={t.icon} size={18} color={tab===t.id?"var(--blue-core)":undefined} />
                 <span style={{ fontFamily:"var(--font-title)", fontSize:8, letterSpacing:1 }}>{t.label}</span>
               </button>

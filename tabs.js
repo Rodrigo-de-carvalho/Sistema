@@ -6,7 +6,10 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
   const [editingName, setEditingName] = React.useState(false);
   const [nameInput,   setNameInput]   = React.useState(profile.name);
   const nameRef = React.useRef();
-  const { level, xpInLevel, xpToNext } = computeLevel(profile.xp);
+  const level    = profile.level;  // nível protegido — nunca regride
+  const floor    = xpFloorForLevel(level);
+  const xpInLevel = Math.max(0, profile.xp - floor);
+  const xpToNext  = xpForLevel(level);
   const rank     = getRankForLevel(level);
   const dispRank = isPremium ? rank : (FREE_RANKS.includes(rank) ? rank : "C");
   const xpPct    = Math.round((xpInLevel / xpToNext) * 100);
@@ -21,7 +24,7 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
   });
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.15s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
 
       {/* ESQUERDA */}
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -396,7 +399,7 @@ function SkillsTab({ profile }) {
   const unlockedIds = new Set(SKILLS.filter(s => profile.achievements.includes(s.unlockBy)).map(s => s.id));
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.15s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:4 }}>HABILIDADES</div>
         {SKILLS.map(sk => {
@@ -442,7 +445,7 @@ function SkillsTab({ profile }) {
       <div>
         {selected ? (
           <div style={{ background:"var(--bg-card)", border:"1px solid var(--border-dim)", borderRadius:6,
-            padding:24, animation:"appear-up 0.15s ease" }}>
+            padding:24, animation:"appear-up 0.25s ease" }}>
             <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:18 }}>DETALHES</div>
             <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
               <div style={{ width:56, height:56, borderRadius:5, background:"rgba(79,140,255,0.08)",
@@ -500,22 +503,19 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
 
   return (
     <div style={{ animation:"appear-up 0.15s ease" }}>
-      {/* Rank badge */}
+      {/* Badge do rank atual */}
       {currentRank && (
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-          <div style={{ background:`${RANK_COLORS[currentRank]}18`,
-            border:`1px solid ${RANK_COLORS[currentRank]}44`,
-            color: RANK_COLORS[currentRank],
-            fontSize:10, padding:"3px 10px", fontFamily:"var(--font-title)",
-            letterSpacing:2, borderRadius:3 }}>
-            MISSÕES RANK {currentRank}
-          </div>
-          <span style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-mono)" }}>
-            escaladas para seu nível atual
-          </span>
+        <div style={{ marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{
+            background: `${RANK_COLORS[currentRank] || "#4f8cff"}18`,
+            border: `1px solid ${RANK_COLORS[currentRank] || "#4f8cff"}44`,
+            color: RANK_COLORS[currentRank] || "#4f8cff",
+            fontSize:9, padding:"3px 10px",
+            fontFamily:"var(--font-title)", letterSpacing:1.5, borderRadius:2,
+          }}>MISSÕES RANK {currentRank} — escaladas para seu nível atual</span>
         </div>
       )}
-      {/* Header com timer */}
+      {/* Header com filtros + timer */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
           {filters.map(f => (
@@ -644,17 +644,44 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
             </span>
           )}
         </div>
+        {/* Banner FOMO para free */}
+        {!isPremium && (
+          <div onClick={onShowPremium} style={{ cursor:"pointer", marginBottom:14, padding:"12px 16px",
+            background:"rgba(155,93,229,0.07)", border:"1px solid rgba(155,93,229,0.25)", borderRadius:6,
+            display:"flex", alignItems:"center", gap:12 }}>
+            <Icon name="star" size={16} color="var(--gold-core)" />
+            <div style={{ flex:1 }}>
+              <div style={{ color:"var(--gold-core)", fontSize:11, fontFamily:"var(--font-title)", letterSpacing:1, marginBottom:2 }}>
+                ⚜ DESBLOQUEIE MISSÕES SEMANAIS COM PREMIUM
+              </div>
+              <div style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-body)" }}>
+                Ganhe até +{WEEKLY_QUESTS.reduce((s,q)=>s+q.tasks.reduce((s2,t)=>s2+t.xp,0)+q.bonusXP,0).toLocaleString()} XP extra por semana. Toque para saber mais.
+              </div>
+            </div>
+            <Icon name="chevron-right" size={14} color="var(--purple-glow)" />
+          </div>
+        )}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
           {WEEKLY_QUESTS.map(q => (
-            <div key={q.id} style={{ position:"relative", borderRadius:6, overflow:"hidden",
-              background:"rgba(10,10,26,0.6)", border:"1px solid rgba(155,93,229,0.2)" }}>
-              <div style={{ padding:16, filter: isPremium?"none":"blur(1.5px)" }}>
+            <div key={q.id} style={{ borderRadius:6, overflow:"hidden",
+              background:"rgba(10,10,26,0.6)",
+              border: isPremium ? "1px solid rgba(155,93,229,0.2)" : "1px solid rgba(155,93,229,0.25)" }}>
+              <div style={{ padding:16 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                   <div>
-                    <span style={{ background:"rgba(155,93,229,0.15)", border:"1px solid rgba(155,93,229,0.35)",
-                      color:"var(--purple-glow)", fontSize:9, padding:"2px 8px", fontFamily:"var(--font-title)",
-                      letterSpacing:1, borderRadius:2, display:"inline-block", marginBottom:8 }}>{q.category}</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                      <span style={{ background:"rgba(155,93,229,0.15)", border:"1px solid rgba(155,93,229,0.35)",
+                        color:"var(--purple-glow)", fontSize:9, padding:"2px 8px", fontFamily:"var(--font-title)",
+                        letterSpacing:1, borderRadius:2 }}>{q.category}</span>
+                      {!isPremium && (
+                        <span style={{ background:"rgba(255,215,0,0.1)", border:"1px solid rgba(255,215,0,0.3)",
+                          color:"var(--gold-core)", fontSize:9, padding:"2px 6px", fontFamily:"var(--font-title)", borderRadius:2 }}>
+                          ⚜ PREMIUM
+                        </span>
+                      )}
+                    </div>
                     <div style={{ color:"var(--text-bright)", fontSize:14, fontFamily:"var(--font-title)", fontWeight:600 }}>{q.title}</div>
+                    <div style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-body)", marginTop:4, lineHeight:1.4 }}>{q.desc}</div>
                   </div>
                   <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
                     <div style={{ color:"var(--purple-glow)", fontSize:11, fontFamily:"var(--font-mono)" }}>
@@ -666,24 +693,31 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
                 <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                   {q.tasks.map(t => (
                     <div key={t.id} style={{ display:"flex", alignItems:"center", gap:8,
-                      color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-body)" }}>
+                      padding:"6px 10px", borderRadius:4,
+                      background: isPremium ? "rgba(255,255,255,0.02)" : "rgba(155,93,229,0.05)",
+                      border:"1px solid rgba(155,93,229,0.15)",
+                      color: isPremium ? "var(--text-dim)" : "var(--text-mid)", fontSize:11, fontFamily:"var(--font-body)",
+                      cursor: isPremium ? "pointer" : "default" }}>
                       <div style={{ width:14, height:14, borderRadius:2, flexShrink:0,
-                        border:"1px solid rgba(155,93,229,0.3)" }} />
-                      {t.label}
-                      <span style={{ marginLeft:"auto", color:"var(--purple-glow)", fontSize:10,
-                        fontFamily:"var(--font-mono)", flexShrink:0 }}>+{t.xp}</span>
+                        border: isPremium ? "1px solid rgba(155,93,229,0.4)" : "1px solid rgba(155,93,229,0.2)",
+                        background:"transparent" }} />
+                      <span style={{ flex:1 }}>{t.label}</span>
+                      <span style={{ color:"var(--purple-glow)", fontSize:10, fontFamily:"var(--font-mono)", flexShrink:0 }}>+{t.xp} XP</span>
                     </div>
                   ))}
                 </div>
+                {/* CTA inline para free */}
+                {!isPremium && (
+                  <div onClick={onShowPremium} style={{ marginTop:12, padding:"8px 12px", borderRadius:4, cursor:"pointer",
+                    background:"rgba(255,215,0,0.06)", border:"1px solid rgba(255,215,0,0.2)",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                    <Icon name="lock" size={11} color="var(--gold-core)" />
+                    <span style={{ color:"var(--gold-core)", fontSize:10, fontFamily:"var(--font-title)", letterSpacing:1 }}>
+                      ATIVAR PREMIUM PARA COMPLETAR
+                    </span>
+                  </div>
+                )}
               </div>
-              {!isPremium && (
-                <div style={{ position:"absolute", inset:0, background:"rgba(2,2,10,0.65)",
-                  display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column",
-                  gap:8, cursor:"pointer" }} onClick={onShowPremium}>
-                  <Icon name="lock" size={22} color="rgba(155,93,229,0.7)" />
-                  <span style={{ color:"var(--gold-core)", fontSize:10, fontFamily:"var(--font-title)", letterSpacing:2 }}>⚜ PREMIUM</span>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -703,7 +737,7 @@ function InventoryTab({ profile }) {
   const typeIcon = { "Insígnia":"star","Moldura":"user","Título":"crown","Tema":"moon" };
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap:16, animation:"appear-up 0.15s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
       <div>
         <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
           {types.map(t => (
@@ -754,7 +788,7 @@ function InventoryTab({ profile }) {
           const unlockAch = ACHIEVEMENTS.find(a => a.id === selected.unlockBy);
           return (
             <div style={{ background:"var(--bg-card)", border:`1px solid ${gc}33`, borderRadius:6,
-              padding:20, animation:"appear-up 0.15s ease", position:"sticky", top:0 }}>
+              padding:20, animation:"appear-up 0.25s ease", position:"sticky", top:0 }}>
               <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:16 }}>DETALHES</div>
               <div style={{ width:60, height:60, borderRadius:6, background:`${gc}12`, border:`1px solid ${gc}44`,
                 display:"flex", alignItems:"center", justifyContent:"center", marginBottom:14, boxShadow:`0 0 20px ${gc}22` }}>
@@ -807,7 +841,7 @@ function AchievementsTab({ profile }) {
     : ALL_ACHIEVEMENTS.filter(a => !unlocked.has(a.id));
 
   return (
-    <div style={{ animation:"appear-up 0.15s ease" }}>
+    <div style={{ animation:"appear-up 0.4s ease" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <div style={{ display:"flex", gap:8 }}>
           {filters.map(f => (

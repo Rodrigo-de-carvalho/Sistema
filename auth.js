@@ -121,13 +121,16 @@ function AuthScreen({ onAuth }) {
           {/* Tabs */}
           <div style={{ display:"flex", marginBottom:22, borderBottom:"1px solid var(--border-dim)" }}>
             {[["login","Entrar"],["register","Criar conta"]].map(([m, label]) => (
-              <button key={m} onClick={() => { setMode(m); setError(""); }} style={{
-                flex:1, padding:"9px 0", background:"none", border:"none",
-                borderBottom:`2px solid ${mode===m?"var(--blue-core)":"transparent"}`,
-                color: mode===m ? "var(--text-bright)" : "var(--text-dim)",
-                fontFamily:"var(--font-title)", fontSize:11, letterSpacing:2, cursor:"pointer",
-                transition:"color 0.15s", WebkitTapHighlightColor:"transparent",
-              }}>{label.toUpperCase()}</button>
+              <button key={m}
+                onClick={() => { setMode(m); setError(""); }}
+                onMouseDown={e => e.preventDefault()}
+                style={{
+                  flex:1, padding:"9px 0", background:"none", border:"none",
+                  borderBottom:`2px solid ${mode===m?"var(--blue-core)":"transparent"}`,
+                  color: mode===m ? "var(--text-bright)" : "var(--text-dim)",
+                  fontFamily:"var(--font-title)", fontSize:11, letterSpacing:2, cursor:"pointer",
+                  transition:"color 0.15s", WebkitTapHighlightColor:"transparent", outline:"none",
+                }}>{label.toUpperCase()}</button>
             ))}
           </div>
 
