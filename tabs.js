@@ -21,7 +21,7 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
   });
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.15s ease" }}>
 
       {/* ESQUERDA */}
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -396,7 +396,7 @@ function SkillsTab({ profile }) {
   const unlockedIds = new Set(SKILLS.filter(s => profile.achievements.includes(s.unlockBy)).map(s => s.id));
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16, animation:"appear-up 0.15s ease" }}>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:4 }}>HABILIDADES</div>
         {SKILLS.map(sk => {
@@ -442,7 +442,7 @@ function SkillsTab({ profile }) {
       <div>
         {selected ? (
           <div style={{ background:"var(--bg-card)", border:"1px solid var(--border-dim)", borderRadius:6,
-            padding:24, animation:"appear-up 0.25s ease" }}>
+            padding:24, animation:"appear-up 0.15s ease" }}>
             <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:18 }}>DETALHES</div>
             <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
               <div style={{ width:56, height:56, borderRadius:5, background:"rgba(79,140,255,0.08)",
@@ -498,7 +498,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
   const shown    = filter === "Todas" ? DAILY_QUESTS : DAILY_QUESTS.filter(q => q.category === filter);
 
   return (
-    <div style={{ animation:"appear-up 0.4s ease" }}>
+    <div style={{ animation:"appear-up 0.15s ease" }}>
       {/* Header com timer */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -687,7 +687,7 @@ function InventoryTab({ profile }) {
   const typeIcon = { "Insígnia":"star","Moldura":"user","Título":"crown","Tema":"moon" };
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap:16, animation:"appear-up 0.4s ease" }}>
+    <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap:16, animation:"appear-up 0.15s ease" }}>
       <div>
         <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
           {types.map(t => (
@@ -738,7 +738,7 @@ function InventoryTab({ profile }) {
           const unlockAch = ACHIEVEMENTS.find(a => a.id === selected.unlockBy);
           return (
             <div style={{ background:"var(--bg-card)", border:`1px solid ${gc}33`, borderRadius:6,
-              padding:20, animation:"appear-up 0.25s ease", position:"sticky", top:0 }}>
+              padding:20, animation:"appear-up 0.15s ease", position:"sticky", top:0 }}>
               <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3, fontFamily:"var(--font-title)", marginBottom:16 }}>DETALHES</div>
               <div style={{ width:60, height:60, borderRadius:6, background:`${gc}12`, border:`1px solid ${gc}44`,
                 display:"flex", alignItems:"center", justifyContent:"center", marginBottom:14, boxShadow:`0 0 20px ${gc}22` }}>
@@ -791,7 +791,7 @@ function AchievementsTab({ profile }) {
     : ALL_ACHIEVEMENTS.filter(a => !unlocked.has(a.id));
 
   return (
-    <div style={{ animation:"appear-up 0.4s ease" }}>
+    <div style={{ animation:"appear-up 0.15s ease" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <div style={{ display:"flex", gap:8 }}>
           {filters.map(f => (
