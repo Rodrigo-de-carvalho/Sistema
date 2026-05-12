@@ -23,9 +23,10 @@ function App() {
   const [clock,      setClock]      = useState("");
   const [countdown,  setCountdown]  = useState("");
   const [isOnline,   setIsOnline]   = useState(navigator.onLine);
-  const [showPremium,     setShowPremium]      = useState(false);
-  const [syncTimer,       setSyncTimer]        = useState(null);
-  const [showPassReset,   setShowPassReset]    = useState(false);
+  const [showPremium,       setShowPremium]        = useState(false);
+  const [syncTimer,         setSyncTimer]          = useState(null);
+  const [showPassReset,     setShowPassReset]       = useState(false);
+  const [pendingPaymentId,  setPendingPaymentId]    = useState(null);
   // Missões: lista fixa do dia (calculada uma vez no load) e registro de XP concedido
   const [dailyQuests,     setDailyQuests]      = useState(null);
   const [missionsGranted, setMissionsGranted]  = useState(() => loadMissionsGranted());
@@ -73,10 +74,33 @@ function App() {
 
   // ── Carregamento inicial ─────────────────────────────────────
   useEffect(() => {
+    // Verifica retorno do Mercado Pago (query params na URL)
+    const params = new URLSearchParams(window.location.search);
+    const mpPaymentId = params.get('payment_id');
+    const mpStatus    = params.get('collection_status') || params.get('status');
+    if (mpPaymentId && mpStatus === 'approved') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setPendingPaymentId(mpPaymentId);
+      setShowPremium(true);
+    }
+
     const initDailyQuests = (p) => {
       if (!dailyQuestsSetRef.current) {
         setDailyQuests(getQuestsForRank(getRankForLevel(p.level)));
         dailyQuestsSetRef.current = true;
+      }
+    };
+
+    // Mescla missions_xp_granted do Supabase com o do localStorage, preferindo o mais recente
+    const mergeMissionsGranted = (remote) => {
+      if (!remote) return;
+      const local = loadMissionsGranted();
+      const today = todayKey();
+      // Usa o registro remoto se for do dia atual e tiver mais entradas
+      if (remote.date === today && remote.granted && remote.granted.length >= (local.granted || []).length) {
+        setMissionsGranted(remote);
+        missionsGrantedRef.current = remote;
+        saveMissionsGranted(remote);
       }
     };
 
@@ -107,6 +131,11 @@ function App() {
             setQuestLog(p2Fixed.quest_log || {});
             initDailyQuests(p2Fixed);
             saveProfile(p2Fixed);
+            // Sincroniza missions_xp_granted do Supabase
+            if (remote.missions_xp_granted) {
+              const mg = remote.missions_xp_granted;
+              mergeMissionsGranted(mg);
+            }
             if (su2) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
           } else if (!cached) {
             setNeedsSetup(true);
@@ -187,10 +216,10 @@ function App() {
     saveProfile(merged);
     if (syncTimer) clearTimeout(syncTimer);
     if (isOnline && session) {
-      const t = setTimeout(() => syncToSupabase(merged, session.user.id), 2000);
+      const t = setTimeout(() => syncToSupabase(merged, session.user.id, missionsGranted), 2000);
       setSyncTimer(t);
     }
-  }, [profile, questLog]);
+  }, [profile, questLog, missionsGranted]);
 
   // ── Helpers ──────────────────────────────────────────────────
   const addAlert = useCallback((msg, sub, type = "info") => {
@@ -242,8 +271,9 @@ function App() {
     setProfile(prev => {
       if (!prev) return prev;
       const newXP    = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
-      // Nível segue o XP diretamente — sobe ao marcar, desce ao desmarcar
-      const newLevel = computeLevel(newXP).level;
+      // Nível NUNCA regride — só sobe quando marcando, protegido ao desmarcar
+      const computed = computeLevel(newXP).level;
+      const newLevel = isDone ? Math.max(prev.level, computed) : computed;
       // Stat e gold só mudam quando há movimento real de XP
       const statDelta = effectiveXP > 0 ? 1 : (isDone && storedXP > 0) ? -1 : 0;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
@@ -331,6 +361,20 @@ function App() {
     addAlert(`Bem-vindo, ${newProfile.name}!`, "Sua jornada começa agora.", "success");
   }, [session]);
 
+  // ── Ativar premium após pagamento confirmado ─────────────────
+  const handlePremiumActivated = useCallback(async () => {
+    if (!session?.user?.id) return;
+    // Recarrega o perfil do Supabase para obter is_premium=true atualizado
+    const remote = await loadFromSupabase(session.user.id);
+    if (remote) {
+      setProfile(prev => prev ? { ...prev, is_premium: true,
+        premium_expires_at: remote.premium_expires_at,
+        streak_shields: SHIELDS_PREMIUM } : prev);
+      saveProfile({ ...(remote), quest_log: questLog });
+    }
+    addAlert("⚜ Premium Ativado!", "Todas as funcionalidades desbloqueadas.", "success");
+  }, [session, questLog]);
+
   const handleLogout = useCallback(async () => {
     if (window.sb) await window.sb.auth.signOut();
     localStorage.removeItem("sistema_profile");
@@ -395,7 +439,16 @@ function App() {
       <Background />
 
       {/* Premium modal */}
-      {showPremium && <PremiumModal profile={profile} questLog={questLog} onClose={() => setShowPremium(false)} />}
+      {showPremium && (
+        <PremiumModal
+          profile={profile}
+          questLog={questLog}
+          userId={session?.user?.id}
+          onClose={() => { setShowPremium(false); setPendingPaymentId(null); }}
+          onPremiumActivated={handlePremiumActivated}
+          pendingPaymentId={pendingPaymentId}
+        />
+      )}
 
       {/* Reset de senha */}
       {showPassReset && <PasswordResetModal onClose={() => setShowPassReset(false)} />}

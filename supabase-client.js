@@ -26,8 +26,20 @@
 //    inventory_items text[]      default array['badge_beginner'],
 //    quest_log       jsonb       default '{}',
 //    premium_gate_shown boolean  default false,
+//    is_premium      boolean     default false,
+//    premium_expires_at timestamptz,
+//    streak_shields  integer     default 1,
+//    shields_month   text,
+//    missions_xp_granted jsonb   default '{}',
 //    updated_at      timestamptz default now()
 //  );
+//
+//  -- Se a tabela já existe, adicione os novos campos:
+//  alter table public.profiles add column if not exists is_premium boolean default false;
+//  alter table public.profiles add column if not exists premium_expires_at timestamptz;
+//  alter table public.profiles add column if not exists streak_shields integer default 1;
+//  alter table public.profiles add column if not exists shields_month text;
+//  alter table public.profiles add column if not exists missions_xp_granted jsonb default '{}';
 //
 //  alter table public.profiles enable row level security;
 //
@@ -134,6 +146,16 @@
 
 const SUPABASE_URL      = 'https://pkewogelkjuvqvmhytwr.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_HGkPnjK6IUYFcr09QRSGvw_Kl9f17vw';
+
+// ── Mercado Pago ──────────────────────────────────────────────────
+// Substitua pelos seus valores reais do painel do Mercado Pago.
+// PUBLIC_KEY: Credenciais > Chave pública (começa com APP_USR-)
+// ACCESS_TOKEN: Credenciais > Access token (começa com APP_USR-)
+// AVISO: o access token fica exposto no código cliente — para produção
+// mova a criação de preferência para um backend/Edge Function.
+const MERCADO_PAGO_PUBLIC_KEY   = 'SEU_PUBLIC_KEY_AQUI';
+const MERCADO_PAGO_ACCESS_TOKEN = 'SEU_ACCESS_TOKEN_AQUI';
+const PREMIUM_PRICE             = 19.90;  // R$
 
 window.SUPABASE_OK = false;
 window.sb = null;

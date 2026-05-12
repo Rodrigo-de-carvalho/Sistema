@@ -162,10 +162,10 @@ function saveProfile(profile) {
   } catch {}
 }
 
-async function syncToSupabase(profile, userId) {
+async function syncToSupabase(profile, userId, missionsGranted) {
   if (!window.sb || !userId) return;
   try {
-    const { error } = await window.sb.from("profiles").upsert({
+    const payload = {
       id: userId,
       name:               profile.name,
       avatar:             profile.avatar,
@@ -181,8 +181,21 @@ async function syncToSupabase(profile, userId) {
       inventory_items:    profile.inventory_items,
       quest_log:          pruneQuestLog(profile.quest_log),
       premium_gate_shown: profile.premium_gate_shown,
+      streak_shields:     profile.streak_shields ?? SHIELDS_FREE,
+      shields_month:      profile.shields_month  ?? null,
       updated_at:         new Date().toISOString(),
-    });
+    };
+    // Só sobrescreve is_premium se já existe no profile (evita limpar valor setado pelo pagamento)
+    if (typeof profile.is_premium === "boolean") {
+      payload.is_premium = profile.is_premium;
+    }
+    if (profile.premium_expires_at) {
+      payload.premium_expires_at = profile.premium_expires_at;
+    }
+    if (missionsGranted) {
+      payload.missions_xp_granted = missionsGranted;
+    }
+    const { error } = await window.sb.from("profiles").upsert(payload);
     if (error) console.warn("[SISTEMA] Sync error:", error.message);
   } catch {}
 }
@@ -192,6 +205,13 @@ async function loadFromSupabase(userId) {
   try {
     const { data, error } = await window.sb.from("profiles").select("*").eq("id", userId).single();
     if (error || !data) return null;
+
+    // Verifica expiração do premium
+    let isPremium = data.is_premium || false;
+    if (isPremium && data.premium_expires_at) {
+      if (new Date(data.premium_expires_at) < new Date()) isPremium = false;
+    }
+
     return {
       name:               data.name             || DEFAULT_PROFILE.name,
       avatar:             data.avatar           || null,
@@ -207,6 +227,11 @@ async function loadFromSupabase(userId) {
       inventory_items:    data.inventory_items || ["badge_beginner"],
       quest_log:          data.quest_log       || {},
       premium_gate_shown: data.premium_gate_shown || false,
+      is_premium:         isPremium,
+      premium_expires_at: data.premium_expires_at || null,
+      streak_shields:     data.streak_shields  ?? (isPremium ? SHIELDS_PREMIUM : SHIELDS_FREE),
+      shields_month:      data.shields_month   || null,
+      missions_xp_granted: data.missions_xp_granted || {},
     };
   } catch { return null; }
 }

@@ -1,19 +1,128 @@
-// ── premium.js — Modal de upgrade Premium ────────────────────────
+// ── premium.js — Modal de upgrade Premium + Mercado Pago ──────────
 
-function PremiumModal({ profile, questLog, onClose }) {
+// ── Mercado Pago helpers ──────────────────────────────────────────
+
+async function createMercadoPagoPreference(userName) {
+  const currentUrl = window.location.href.split('?')[0];
+  const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+    },
+    body: JSON.stringify({
+      items: [{
+        id:          'sistema_premium_mensal',
+        title:       'SISTEMA Premium — Assinatura Mensal',
+        description: 'Acesso completo a todas as funcionalidades Premium por 1 mês',
+        quantity:    1,
+        currency_id: 'BRL',
+        unit_price:  PREMIUM_PRICE,
+      }],
+      back_urls: {
+        success: currentUrl,
+        failure: currentUrl,
+        pending: currentUrl,
+      },
+      auto_return: 'approved',
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || `Erro ${response.status} ao criar preferência de pagamento`);
+  }
+  const data = await response.json();
+  return data.init_point;
+}
+
+async function verifyMercadoPagoPayment(paymentId) {
+  try {
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { 'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}` },
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.status === 'approved';
+  } catch { return false; }
+}
+
+async function activatePremiumInSupabase(userId) {
+  if (!window.sb || !userId) return false;
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await window.sb.from("profiles").update({
+    is_premium:         true,
+    premium_expires_at: expiresAt,
+    streak_shields:     SHIELDS_PREMIUM,
+  }).eq("id", userId);
+  return !error;
+}
+
+// ── PremiumModal ──────────────────────────────────────────────────
+
+function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, pendingPaymentId }) {
   const xpLost       = getPremiumXPLost(questLog);
   const monthXP      = getMonthXP(questLog);
-  const [count, setCount] = React.useState(0);
+  const isMobile     = useIsMobile();
+  const [count,      setCount]      = React.useState(0);
+  const [payState,   setPayState]   = React.useState('idle');  // idle | loading | verifying | success | error
+  const [payError,   setPayError]   = React.useState('');
+  const notConfigured = MERCADO_PAGO_ACCESS_TOKEN === 'SEU_ACCESS_TOKEN_AQUI';
 
   // Animação do contador de XP perdido
   React.useEffect(() => {
     if (xpLost === 0) return;
-    const step     = Math.ceil(xpLost / 60);
-    const interval = setInterval(() => {
-      setCount(c => { if (c + step >= xpLost) { clearInterval(interval); return xpLost; } return c + step; });
+    const step = Math.ceil(xpLost / 60);
+    const iv   = setInterval(() => {
+      setCount(c => { if (c + step >= xpLost) { clearInterval(iv); return xpLost; } return c + step; });
     }, 16);
-    return () => clearInterval(interval);
+    return () => clearInterval(iv);
   }, [xpLost]);
+
+  // Verificar pagamento pendente ao abrir (retorno do checkout MP)
+  React.useEffect(() => {
+    if (!pendingPaymentId) return;
+    handleVerifyPayment(pendingPaymentId);
+  }, [pendingPaymentId]);
+
+  const handleVerifyPayment = async (paymentId) => {
+    setPayState('verifying');
+    setPayError('');
+    const isApproved = await verifyMercadoPagoPayment(paymentId);
+    if (isApproved) {
+      const activated = await activatePremiumInSupabase(userId);
+      if (activated) {
+        setPayState('success');
+        onPremiumActivated?.();
+      } else {
+        setPayState('error');
+        setPayError('Pagamento aprovado, mas erro ao ativar. Recarregue a página.');
+      }
+    } else {
+      setPayState('error');
+      setPayError('Pagamento não confirmado. Verifique e tente novamente.');
+    }
+  };
+
+  const handleSubscribe = async () => {
+    if (notConfigured) {
+      setPayError('Configure MERCADO_PAGO_ACCESS_TOKEN em supabase-client.js para ativar pagamentos.');
+      return;
+    }
+    if (!userId) {
+      setPayError('Você precisa estar logado para assinar.');
+      return;
+    }
+    setPayState('loading');
+    setPayError('');
+    try {
+      const checkoutUrl = await createMercadoPagoPreference(profile.name);
+      window.location.href = checkoutUrl;
+    } catch (err) {
+      setPayError(err.message);
+      setPayState('error');
+    }
+  };
 
   const freeFeatures = [
     "Missões diárias (5 por dia)",
@@ -31,7 +140,7 @@ function PremiumModal({ profile, questLog, onClose }) {
     { text: "Conquistas Épicas e Lendárias",               hot: false },
     { text: "Ranks B, A e S desbloqueados",                hot: false },
     { text: 'Badge exclusivo "Caçador Premium"',           hot: false },
-    { text: "Missões de desafio com recompensas únicas",   hot: false },
+    { text: "Distribuição livre de pontos de atributo",    hot: false },
   ];
 
   return (
@@ -46,10 +155,10 @@ function PremiumModal({ profile, questLog, onClose }) {
         boxShadow:"0 0 80px rgba(255,215,0,0.08), 0 0 0 1px rgba(255,215,0,0.1)" }}>
 
         {/* ── Header ── */}
-        <div style={{ position:"relative", padding:"32px 36px 24px", overflow:"hidden",
+        <div style={{ position:"relative", padding: isMobile ? "20px 20px 16px" : "32px 36px 24px",
+          overflow:"hidden",
           background:"linear-gradient(135deg,rgba(30,15,60,0.9),rgba(10,10,30,0.9))",
           borderBottom:"1px solid rgba(255,215,0,0.15)" }}>
-          {/* Shimmer */}
           <div style={{ position:"absolute", inset:0, pointerEvents:"none",
             background:"linear-gradient(90deg,transparent 0%,rgba(255,215,0,0.04) 50%,transparent 100%)",
             backgroundSize:"200% 100%", animation:"premium-shimmer 3s linear infinite" }} />
@@ -57,9 +166,9 @@ function PremiumModal({ profile, questLog, onClose }) {
           <div style={{ position:"relative", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
             <div>
               <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
-                <span style={{ fontSize:28, animation:"streak-flame 2s ease infinite" }}>⚜</span>
+                <span style={{ fontSize:isMobile?22:28, animation:"streak-flame 2s ease infinite" }}>⚜</span>
                 <div>
-                  <div style={{ fontFamily:"var(--font-title)", fontSize:22, fontWeight:900,
+                  <div style={{ fontFamily:"var(--font-title)", fontSize:isMobile?16:22, fontWeight:900,
                     letterSpacing:3, color:"var(--gold-core)",
                     textShadow:"0 0 20px rgba(255,215,0,0.5)" }}>SISTEMA PREMIUM</div>
                   <div style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-mono)", letterSpacing:2 }}>
@@ -69,22 +178,23 @@ function PremiumModal({ profile, questLog, onClose }) {
               </div>
             </div>
             <button onClick={onClose} style={{ background:"rgba(255,255,255,0.05)", border:"1px solid var(--border-dim)",
-              color:"var(--text-dim)", cursor:"pointer", padding:"6px 10px", borderRadius:4 }}>
+              color:"var(--text-dim)", cursor:"pointer", padding:"6px 10px", borderRadius:4, flexShrink:0 }}>
               <Icon name="x" size={14} />
             </button>
           </div>
 
-          {/* ── Contador de XP perdido ── */}
+          {/* Contador de XP perdido */}
           {monthXP > 0 && (
             <div style={{ marginTop:20, background:"rgba(255,68,102,0.08)", border:"1px solid rgba(255,68,102,0.3)",
-              borderRadius:8, padding:"16px 20px", display:"flex", alignItems:"center", gap:20 }}>
-              <div style={{ fontSize:32 }}>😔</div>
-              <div style={{ flex:1 }}>
+              borderRadius:8, padding: isMobile?"12px 14px":"16px 20px",
+              display:"flex", alignItems:"center", gap: isMobile?12:20, flexWrap:"wrap" }}>
+              <div style={{ fontSize:isMobile?24:32 }}>😔</div>
+              <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-mono)", letterSpacing:2, marginBottom:4 }}>
                   XP PERDIDO ESTE MÊS POR NÃO SER PREMIUM
                 </div>
                 <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
-                  <span style={{ fontFamily:"var(--font-title)", fontSize:36, fontWeight:900,
+                  <span style={{ fontFamily:"var(--font-title)", fontSize:isMobile?26:36, fontWeight:900,
                     color:"var(--red-core)", textShadow:"0 0 20px rgba(255,68,102,0.5)" }}>
                     {count.toLocaleString()}
                   </span>
@@ -94,26 +204,33 @@ function PremiumModal({ profile, questLog, onClose }) {
                   Com Premium, você teria recebido <strong style={{color:"var(--gold-core)"}}>+25%</strong> em cada tarefa completada
                 </div>
               </div>
-              <div style={{ textAlign:"center", flexShrink:0 }}>
-                <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:1, marginBottom:4 }}>SEU XP REAL</div>
-                <div style={{ fontFamily:"var(--font-title)", fontSize:20, fontWeight:700, color:"var(--text-mid)" }}>
-                  {monthXP.toLocaleString()}
+              {!isMobile && (
+                <div style={{ textAlign:"center", flexShrink:0 }}>
+                  <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:1, marginBottom:4 }}>SEU XP REAL</div>
+                  <div style={{ fontFamily:"var(--font-title)", fontSize:20, fontWeight:700, color:"var(--text-mid)" }}>
+                    {monthXP.toLocaleString()}
+                  </div>
+                  <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", marginTop:2 }}>vs</div>
+                  <div style={{ fontFamily:"var(--font-title)", fontSize:20, fontWeight:700, color:"var(--gold-core)" }}>
+                    {Math.floor(monthXP * 1.25).toLocaleString()}
+                  </div>
+                  <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", marginTop:2 }}>COM PREMIUM</div>
                 </div>
-                <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", marginTop:2 }}>vs</div>
-                <div style={{ fontFamily:"var(--font-title)", fontSize:20, fontWeight:700, color:"var(--gold-core)" }}>
-                  {Math.floor(monthXP * 1.25).toLocaleString()}
-                </div>
-                <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", marginTop:2 }}>COM PREMIUM</div>
-              </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── Comparação ── */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:0, padding:"24px 36px" }}>
+        {/* ── Comparação FREE vs PREMIUM ── */}
+        <div style={{ display:"grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap:0, padding: isMobile?"16px 20px":"24px 36px" }}>
 
           {/* Free */}
-          <div style={{ paddingRight:24, borderRight:"1px solid var(--border-dim)" }}>
+          <div style={{ paddingRight: isMobile?0:24,
+            borderRight: isMobile?"none":"1px solid var(--border-dim)",
+            borderBottom: isMobile?"1px solid var(--border-dim)":"none",
+            paddingBottom: isMobile?16:0, marginBottom: isMobile?16:0 }}>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
               <div style={{ background:"rgba(68,85,119,0.3)", border:"1px solid var(--border-dim)",
                 color:"var(--text-dim)", fontSize:11, padding:"4px 14px", borderRadius:20,
@@ -134,7 +251,7 @@ function PremiumModal({ profile, questLog, onClose }) {
           </div>
 
           {/* Premium */}
-          <div style={{ paddingLeft:24 }}>
+          <div style={{ paddingLeft: isMobile?0:24 }}>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
               <div style={{ background:"linear-gradient(90deg,rgba(255,215,0,0.2),rgba(255,102,221,0.15))",
                 border:"1px solid rgba(255,215,0,0.4)", color:"var(--gold-core)",
@@ -165,7 +282,8 @@ function PremiumModal({ profile, questLog, onClose }) {
         </div>
 
         {/* ── Preview missões semanais ── */}
-        <div style={{ margin:"0 36px", padding:20, background:"rgba(155,93,229,0.04)",
+        <div style={{ margin: isMobile?"0 20px":"0 36px", padding:20,
+          background:"rgba(155,93,229,0.04)",
           border:"1px solid rgba(155,93,229,0.2)", borderRadius:8, marginBottom:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
             <Icon name="lock" size={14} color="var(--purple-glow)" />
@@ -173,9 +291,12 @@ function PremiumModal({ profile, questLog, onClose }) {
               MISSÕES SEMANAIS — EXCLUSIVO PREMIUM
             </span>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+          <div style={{ display:"grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)",
+            gap:10 }}>
             {WEEKLY_QUESTS.map(q => (
-              <div key={q.id} style={{ background:"rgba(10,10,26,0.8)", border:"1px solid rgba(155,93,229,0.2)",
+              <div key={q.id} style={{ background:"rgba(10,10,26,0.8)",
+                border:"1px solid rgba(155,93,229,0.2)",
                 borderRadius:6, padding:14, filter:"blur(0.5px)", position:"relative", overflow:"hidden" }}>
                 <div style={{ position:"absolute", inset:0, backdropFilter:"blur(2px)",
                   background:"rgba(2,2,10,0.4)", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -191,44 +312,105 @@ function PremiumModal({ profile, questLog, onClose }) {
           </div>
         </div>
 
-        {/* ── Badge Premium preview ── */}
-        <div style={{ margin:"0 36px 24px", display:"flex", alignItems:"center", gap:20,
-          padding:20, background:"rgba(255,102,221,0.04)", border:"1px solid rgba(255,102,221,0.2)", borderRadius:8 }}>
-          <div style={{ width:60, height:60, borderRadius:8, flexShrink:0,
-            background:"linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,102,221,0.2))",
-            border:"1px solid rgba(255,215,0,0.4)",
-            display:"flex", alignItems:"center", justifyContent:"center", fontSize:28,
-            boxShadow:"0 0 20px rgba(255,215,0,0.15)" }}>⚜</div>
-          <div>
-            <div style={{ color:"var(--gold-core)", fontSize:14, fontFamily:"var(--font-title)",
-              fontWeight:700, letterSpacing:1, marginBottom:4 }}>Badge Exclusivo: Caçador Premium</div>
-            <div style={{ color:"var(--text-mid)", fontSize:12, fontFamily:"var(--font-body)" }}>
-              Exibido no seu perfil. Mostra sua dedicação à jornada de evolução.
-            </div>
-          </div>
-          <div style={{ flexShrink:0, background:"rgba(255,102,221,0.1)", border:"1px solid rgba(255,102,221,0.3)",
-            color:"#ff66dd", fontSize:10, padding:"3px 10px", borderRadius:3, fontFamily:"var(--font-title)" }}>
-            MÍTICO
-          </div>
-        </div>
+        {/* ── CTA / Pagamento ── */}
+        <div style={{ padding: isMobile?"0 20px 24px":"0 36px 32px",
+          display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
 
-        {/* ── CTA ── */}
-        <div style={{ padding:"0 36px 32px", display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
-          <button style={{ width:"100%", maxWidth:400, padding:"14px 0", borderRadius:6,
-            background:"linear-gradient(90deg,rgba(255,215,0,0.2),rgba(155,93,229,0.2),rgba(255,215,0,0.2))",
-            backgroundSize:"200% 100%", animation:"premium-shimmer 3s linear infinite",
-            border:"1px solid rgba(255,215,0,0.5)", color:"var(--gold-core)",
-            fontFamily:"var(--font-title)", fontSize:14, letterSpacing:3, cursor:"pointer",
-            boxShadow:"0 0 20px rgba(255,215,0,0.15)" }}>
-            ⚜ ASSINAR PREMIUM
-          </button>
-          <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)", textAlign:"center" }}>
-            Em breve — integração de pagamento chegando
-          </div>
+          {/* Estado: sucesso */}
+          {payState === 'success' && (
+            <div style={{ width:"100%", maxWidth:400, padding:"20px 24px", borderRadius:8,
+              background:"rgba(0,255,136,0.08)", border:"1px solid rgba(0,255,136,0.4)",
+              textAlign:"center" }}>
+              <div style={{ fontSize:32, marginBottom:12 }}>🎉</div>
+              <div style={{ fontFamily:"var(--font-title)", fontSize:16, color:"var(--green-core)",
+                letterSpacing:2, marginBottom:8 }}>PREMIUM ATIVADO!</div>
+              <div style={{ color:"var(--text-mid)", fontSize:12, fontFamily:"var(--font-body)", marginBottom:16 }}>
+                Bem-vindo ao SISTEMA Premium. Todas as funcionalidades foram desbloqueadas.
+              </div>
+              <button onClick={onClose} style={{ background:"var(--green-core)", border:"none",
+                color:"#000", fontFamily:"var(--font-title)", fontSize:12, letterSpacing:2,
+                padding:"10px 24px", borderRadius:4, cursor:"pointer", fontWeight:700 }}>
+                COMEÇAR AGORA
+              </button>
+            </div>
+          )}
+
+          {/* Estado: verificando pagamento */}
+          {payState === 'verifying' && (
+            <div style={{ width:"100%", maxWidth:400, padding:"20px 24px", borderRadius:8,
+              background:"rgba(255,215,0,0.06)", border:"1px solid rgba(255,215,0,0.3)",
+              textAlign:"center" }}>
+              <div style={{ fontSize:28, marginBottom:10, animation:"spin-slow 1.5s linear infinite",
+                display:"inline-block" }}>⚙</div>
+              <div style={{ fontFamily:"var(--font-title)", fontSize:13, color:"var(--gold-core)",
+                letterSpacing:2, marginBottom:6 }}>VERIFICANDO PAGAMENTO...</div>
+              <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)" }}>
+                Confirmando pagamento com o Mercado Pago
+              </div>
+            </div>
+          )}
+
+          {/* Estado: carregando */}
+          {payState === 'loading' && (
+            <div style={{ width:"100%", maxWidth:400, padding:"16px 24px", borderRadius:8,
+              background:"rgba(255,215,0,0.06)", border:"1px solid rgba(255,215,0,0.3)",
+              textAlign:"center" }}>
+              <div style={{ fontFamily:"var(--font-title)", fontSize:13, color:"var(--gold-core)", letterSpacing:2 }}>
+                REDIRECIONANDO PARA O PAGAMENTO...
+              </div>
+              <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)", marginTop:6 }}>
+                Você será redirecionado ao Mercado Pago
+              </div>
+            </div>
+          )}
+
+          {/* Estado: idle ou erro — mostra botão */}
+          {(payState === 'idle' || payState === 'error') && (
+            <>
+              {/* Preço */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                <span style={{ fontFamily:"var(--font-title)", fontSize:28, fontWeight:900,
+                  color:"var(--gold-core)", textShadow:"0 0 16px rgba(255,215,0,0.4)" }}>
+                  R$ {PREMIUM_PRICE.toFixed(2).replace('.', ',')}
+                </span>
+                <span style={{ color:"var(--text-dim)", fontSize:12, fontFamily:"var(--font-mono)" }}>/mês</span>
+              </div>
+
+              <button
+                onClick={handleSubscribe}
+                disabled={payState === 'loading'}
+                style={{ width:"100%", maxWidth:400, padding:"14px 0", borderRadius:6,
+                  background:"linear-gradient(90deg,rgba(255,215,0,0.2),rgba(155,93,229,0.2),rgba(255,215,0,0.2))",
+                  backgroundSize:"200% 100%", animation:"premium-shimmer 3s linear infinite",
+                  border:"1px solid rgba(255,215,0,0.5)", color:"var(--gold-core)",
+                  fontFamily:"var(--font-title)", fontSize:14, letterSpacing:3, cursor:"pointer",
+                  boxShadow:"0 0 20px rgba(255,215,0,0.15)",
+                  opacity: payState === 'loading' ? 0.6 : 1 }}>
+                {notConfigured ? "⚜ ASSINAR PREMIUM (configurar MP)" : "⚜ ASSINAR POR R$ 19,90/MÊS"}
+              </button>
+
+              {payError && (
+                <div style={{ width:"100%", maxWidth:400, padding:"10px 14px", borderRadius:4,
+                  background:"rgba(255,68,102,0.08)", border:"1px solid rgba(255,68,102,0.3)",
+                  color:"var(--red-core)", fontSize:11, fontFamily:"var(--font-mono)",
+                  textAlign:"center" }}>
+                  {payError}
+                </div>
+              )}
+
+              <div style={{ display:"flex", alignItems:"center", gap:8, opacity:0.7 }}>
+                <span style={{ fontSize:14 }}>🔒</span>
+                <span style={{ color:"var(--text-dim)", fontSize:10, fontFamily:"var(--font-mono)" }}>
+                  Pagamento seguro via Mercado Pago
+                </span>
+              </div>
+            </>
+          )}
+
           <button onClick={onClose} style={{ background:"none", border:"none",
             color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)",
-            cursor:"pointer", textDecoration:"underline" }}>
-            Continuar no plano gratuito
+            cursor:"pointer", textDecoration:"underline", marginTop:4 }}>
+            {payState === 'success' ? "Fechar" : "Continuar no plano gratuito"}
           </button>
         </div>
       </div>

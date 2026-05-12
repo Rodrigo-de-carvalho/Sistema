@@ -82,6 +82,24 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
                   color: RANK_COLORS[dispRank], fontSize:11, padding:"2px 8px",
                   fontFamily:"var(--font-title)", fontWeight:700, borderRadius:2,
                   animation:"rank-glow 2.5s ease infinite" }}>RANK {dispRank}</span>
+                {/* Badge FREE / PREMIUM */}
+                {isPremium ? (
+                  <span style={{ background:"linear-gradient(90deg,rgba(255,215,0,0.2),rgba(255,102,221,0.15))",
+                    border:"1px solid rgba(255,215,0,0.5)", color:"var(--gold-core)", fontSize:9,
+                    padding:"2px 8px", fontFamily:"var(--font-title)", letterSpacing:1, borderRadius:2,
+                    boxShadow:"0 0 8px rgba(255,215,0,0.2)", animation:"rank-glow 2.5s ease infinite" }}>
+                    ⚜ PREMIUM
+                  </span>
+                ) : (
+                  <span onClick={onShowPremium} style={{ background:"rgba(68,85,119,0.25)",
+                    border:"1px solid rgba(100,120,160,0.35)", color:"var(--text-dim)", fontSize:9,
+                    padding:"2px 8px", fontFamily:"var(--font-title)", letterSpacing:1, borderRadius:2,
+                    cursor:"pointer" }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(255,215,0,0.4)"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(100,120,160,0.35)"}>
+                    FREE
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -516,24 +534,35 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
         </div>
       )}
       {/* Header com filtros + timer */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {filters.map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{
-              background: filter===f?"rgba(79,140,255,0.15)":"transparent",
-              border:`1px solid ${filter===f?"rgba(79,140,255,0.5)":"var(--border-dim)"}`,
-              color: filter===f?"var(--blue-glow)":"var(--text-dim)",
-              padding:"5px 14px", borderRadius:3, cursor:"pointer",
-              fontFamily:"var(--font-title)", fontSize:10, letterSpacing:1, transition:"all 0.15s",
-            }}>{f}</button>
-          ))}
-        </div>
-        <div style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(255,68,102,0.08)",
-          border:"1px solid rgba(255,68,102,0.2)", borderRadius:4, padding:"6px 12px", flexShrink:0 }}>
-          <Icon name="clock" size={12} color="var(--red-core)" />
-          <span style={{ color:"var(--red-core)", fontSize:12, fontFamily:"var(--font-mono)" }}>Reset: {countdown}</span>
-        </div>
-      </div>
+      {React.createElement(React.Fragment, null,
+        React.createElement("div", {
+          style: { display:"flex", alignItems:"center", gap:8,
+            background:"rgba(255,68,102,0.08)", border:"1px solid rgba(255,68,102,0.2)",
+            borderRadius:4, padding:"6px 12px", marginBottom:10, alignSelf:"flex-start",
+            width:"fit-content" }
+        },
+          React.createElement(Icon, { name:"clock", size:12, color:"var(--red-core)" }),
+          React.createElement("span", { style:{ color:"var(--red-core)", fontSize:12, fontFamily:"var(--font-mono)" } },
+            `Reset: ${countdown}`)
+        ),
+        React.createElement("div", {
+          style: { display:"flex", gap:6, flexWrap:"wrap", marginBottom:16 }
+        },
+          filters.map(f =>
+            React.createElement("button", {
+              key: f, onClick: () => setFilter(f),
+              style: {
+                background: filter===f?"rgba(79,140,255,0.15)":"transparent",
+                border: `1px solid ${filter===f?"rgba(79,140,255,0.5)":"var(--border-dim)"}`,
+                color: filter===f?"var(--blue-glow)":"var(--text-dim)",
+                padding:"5px 12px", borderRadius:3, cursor:"pointer",
+                fontFamily:"var(--font-title)", fontSize:10, letterSpacing:1, transition:"all 0.15s",
+                whiteSpace:"nowrap",
+              }
+            }, f)
+          )
+        )
+      )}
 
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
         {shown.map(q => {
