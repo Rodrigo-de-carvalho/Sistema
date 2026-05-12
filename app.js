@@ -165,33 +165,53 @@ function App() {
   useEffect(() => {
     if (!profile) return;
     // Conquistas que merecem ser ganhas AGORA (baseado no estado atual)
-    const currentIds = computeCurrentAchievements(profile, questLog);
+    const currentIds  = computeCurrentAchievements(profile, questLog);
     const newlyEarned = currentIds.filter(id => !profile.achievements.includes(id));
     const lost        = profile.achievements.filter(id => !currentIds.includes(id));
 
-    // Nada mudou
     if (newlyEarned.length === 0 && lost.length === 0) return;
 
-    const bonusXP  = newlyEarned.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
-    const newItems = newlyEarned.flatMap(id => ACH_TO_ITEMS[id] || []);
+    // XP ganho com novas conquistas e XP a devolver das perdidas
+    const gainedXP = newlyEarned.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
+    const lostXP   = lost.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
+
+    // Itens concedidos pelas novas conquistas
+    const newItems  = newlyEarned.flatMap(id => ACH_TO_ITEMS[id] || []);
     const newTitles = newItems
-      .filter(id => INVENTORY_ITEMS.find(i=>i.id===id&&i.type==="Título"))
-      .map(id => INVENTORY_ITEMS.find(i=>i.id===id)?.name).filter(Boolean);
+      .filter(id => INVENTORY_ITEMS.find(i => i.id===id && i.type==="Título"))
+      .map(id => INVENTORY_ITEMS.find(i => i.id===id)?.name).filter(Boolean);
+
+    // Itens a remover: concedidos por conquistas perdidas E não protegidos por conquistas ainda ativas
+    const lostItems       = lost.flatMap(id => ACH_TO_ITEMS[id] || []);
+    const keptByOtherAch  = currentIds.flatMap(id => ACH_TO_ITEMS[id] || []);
+    const itemsToRemove   = lostItems.filter(item => !keptByOtherAch.includes(item));
 
     setProfile(prev => {
       if (!prev) return prev;
+      const newXP   = Math.max(0, prev.xp + gainedXP - lostXP);
+      const newLevel = computeLevel(newXP).level;
       return {
         ...prev,
-        xp:              prev.xp + bonusXP,
-        achievements:    currentIds,                    // reflete estado real
-        inventory_items: [...new Set([...(prev.inventory_items||[]), ...newItems])],
-        titles:          [...new Set([...prev.titles, ...newTitles])],
+        xp:              newXP,
+        level:           newLevel,
+        achievements:    currentIds,
+        inventory_items: [
+          ...new Set([
+            ...(prev.inventory_items || []).filter(i => !itemsToRemove.includes(i)),
+            ...newItems,
+          ])
+        ],
+        titles: [...new Set([...prev.titles, ...newTitles])],
       };
     });
 
     newlyEarned.forEach(id => {
       const a = ACHIEVEMENTS.find(x => x.id === id);
       if (a) addAlert(`Conquista: ${a.name}`, `+${a.xp} XP · ${a.grade}`, "success");
+    });
+    lost.forEach(id => {
+      const a = ACHIEVEMENTS.find(x => x.id === id);
+      if (a && a.xp > 0) addAlert(`Conquista revertida: ${a.name}`, `-${a.xp} XP`, "warning");
     });
   }, [profile?.streak, profile?.level, profile?.stats?.FOR, profile?.stats?.INT,
       JSON.stringify(Object.keys(questLog)), countTotalTasks(questLog)]);
@@ -271,9 +291,8 @@ function App() {
     setProfile(prev => {
       if (!prev) return prev;
       const newXP    = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
-      // Nível NUNCA regride — só sobe quando marcando, protegido ao desmarcar
-      const computed = computeLevel(newXP).level;
-      const newLevel = isDone ? Math.max(prev.level, computed) : computed;
+      // Nível sempre reflete o XP atual — pode subir ou descer naturalmente
+      const newLevel = computeLevel(newXP).level;
       // Stat e gold só mudam quando há movimento real de XP
       const statDelta = effectiveXP > 0 ? 1 : (isDone && storedXP > 0) ? -1 : 0;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
