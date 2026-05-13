@@ -55,7 +55,7 @@ serve(async (req) => {
 
       const data = await res.json();
       return new Response(
-        JSON.stringify({ init_point: data.init_point }),
+        JSON.stringify({ checkout_url: data.init_point }),
         { headers: { ...CORS, "Content-Type": "application/json" } },
       );
     }

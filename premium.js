@@ -19,7 +19,7 @@ async function createMercadoPagoPreference(userEmail) {
   if (!response.ok || data.error) {
     throw new Error(data.error || `Erro ${response.status} ao criar pagamento`);
   }
-  return data.checkout_url;
+  return data.checkout_url || data.init_point;
 }
 
 async function activatePremiumInSupabase(userId) {
