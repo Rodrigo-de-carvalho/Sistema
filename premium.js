@@ -73,16 +73,21 @@ function PremiumModal({ profile, questLog, userId, userEmail, onClose, onPremium
   };
 
   const handleSubscribe = async (userEmail) => {
+    console.log('[SISTEMA] handleSubscribe chamado', { userId, userEmail });
     if (!userId) {
-      setPayError('Você precisa estar logado para assinar.');
+      setPayError('Você precisa estar logado para assinar. Faça login e tente novamente.');
       return;
     }
     setPayState('loading');
     setPayError('');
     try {
+      console.log('[SISTEMA] Chamando Edge Function MP...', MP_EDGE_URL);
       const checkoutUrl = await createMercadoPagoPreference(userEmail);
+      console.log('[SISTEMA] checkout_url recebido:', checkoutUrl);
+      if (!checkoutUrl) throw new Error('Edge Function não retornou checkout_url. Verifique se a função está deployada.');
       window.location.href = checkoutUrl;
     } catch (err) {
+      console.error('[SISTEMA] Erro no pagamento:', err);
       setPayError(err.message);
       setPayState('error');
     }
