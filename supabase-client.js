@@ -26,8 +26,20 @@
 //    inventory_items text[]      default array['badge_beginner'],
 //    quest_log       jsonb       default '{}',
 //    premium_gate_shown boolean  default false,
+//    is_premium      boolean     default false,
+//    premium_expires_at timestamptz,
+//    streak_shields  integer     default 1,
+//    shields_month   text,
+//    missions_xp_granted jsonb   default '{}',
 //    updated_at      timestamptz default now()
 //  );
+//
+//  -- Se a tabela já existe, adicione os novos campos:
+//  alter table public.profiles add column if not exists is_premium boolean default false;
+//  alter table public.profiles add column if not exists premium_expires_at timestamptz;
+//  alter table public.profiles add column if not exists streak_shields integer default 1;
+//  alter table public.profiles add column if not exists shields_month text;
+//  alter table public.profiles add column if not exists missions_xp_granted jsonb default '{}';
 //
 //  alter table public.profiles enable row level security;
 //
@@ -134,6 +146,11 @@
 
 const SUPABASE_URL      = 'https://pkewogelkjuvqvmhytwr.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_HGkPnjK6IUYFcr09QRSGvw_Kl9f17vw';
+
+// ── Mercado Pago ──────────────────────────────────────────────────
+const MERCADO_PAGO_PUBLIC_KEY   = 'TEST-ea293ef2-fd27-4de3-ad83-e2af85c57d93';
+const MERCADO_PAGO_ACCESS_TOKEN = 'TEST-6349398197443388-051307-2b5e69d753f7ea67211097ac6bbc331c-2419335185';
+const PREMIUM_PRICE             = 15.00;  // R$
 
 window.SUPABASE_OK = false;
 window.sb = null;

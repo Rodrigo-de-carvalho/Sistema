@@ -23,9 +23,10 @@ function App() {
   const [clock,      setClock]      = useState("");
   const [countdown,  setCountdown]  = useState("");
   const [isOnline,   setIsOnline]   = useState(navigator.onLine);
-  const [showPremium,     setShowPremium]      = useState(false);
-  const [syncTimer,       setSyncTimer]        = useState(null);
-  const [showPassReset,   setShowPassReset]    = useState(false);
+  const [showPremium,       setShowPremium]        = useState(false);
+  const [syncTimer,         setSyncTimer]          = useState(null);
+  const [showPassReset,     setShowPassReset]       = useState(false);
+  const [pendingPaymentId,  setPendingPaymentId]    = useState(null);
   // Missões: lista fixa do dia (calculada uma vez no load) e registro de XP concedido
   const [dailyQuests,     setDailyQuests]      = useState(null);
   const [missionsGranted, setMissionsGranted]  = useState(() => loadMissionsGranted());
@@ -73,10 +74,32 @@ function App() {
 
   // ── Carregamento inicial ─────────────────────────────────────
   useEffect(() => {
+    // Verifica retorno do checkout do Mercado Pago
+    const params        = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment_status');
+    if (paymentStatus === 'approved') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setPendingPaymentId('approved');  // sinaliza ativação direta
+      setShowPremium(true);
+    }
+
     const initDailyQuests = (p) => {
       if (!dailyQuestsSetRef.current) {
         setDailyQuests(getQuestsForRank(getRankForLevel(p.level)));
         dailyQuestsSetRef.current = true;
+      }
+    };
+
+    // Mescla missions_xp_granted do Supabase com o do localStorage, preferindo o mais recente
+    const mergeMissionsGranted = (remote) => {
+      if (!remote) return;
+      const local = loadMissionsGranted();
+      const today = todayKey();
+      // Usa o registro remoto se for do dia atual e tiver mais entradas
+      if (remote.date === today && remote.granted && remote.granted.length >= (local.granted || []).length) {
+        setMissionsGranted(remote);
+        missionsGrantedRef.current = remote;
+        saveMissionsGranted(remote);
       }
     };
 
@@ -107,6 +130,11 @@ function App() {
             setQuestLog(p2Fixed.quest_log || {});
             initDailyQuests(p2Fixed);
             saveProfile(p2Fixed);
+            // Sincroniza missions_xp_granted do Supabase
+            if (remote.missions_xp_granted) {
+              const mg = remote.missions_xp_granted;
+              mergeMissionsGranted(mg);
+            }
             if (su2) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
           } else if (!cached) {
             setNeedsSetup(true);
@@ -136,33 +164,53 @@ function App() {
   useEffect(() => {
     if (!profile) return;
     // Conquistas que merecem ser ganhas AGORA (baseado no estado atual)
-    const currentIds = computeCurrentAchievements(profile, questLog);
+    const currentIds  = computeCurrentAchievements(profile, questLog);
     const newlyEarned = currentIds.filter(id => !profile.achievements.includes(id));
     const lost        = profile.achievements.filter(id => !currentIds.includes(id));
 
-    // Nada mudou
     if (newlyEarned.length === 0 && lost.length === 0) return;
 
-    const bonusXP  = newlyEarned.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
-    const newItems = newlyEarned.flatMap(id => ACH_TO_ITEMS[id] || []);
+    // XP ganho com novas conquistas e XP a devolver das perdidas
+    const gainedXP = newlyEarned.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
+    const lostXP   = lost.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
+
+    // Itens concedidos pelas novas conquistas
+    const newItems  = newlyEarned.flatMap(id => ACH_TO_ITEMS[id] || []);
     const newTitles = newItems
-      .filter(id => INVENTORY_ITEMS.find(i=>i.id===id&&i.type==="Título"))
-      .map(id => INVENTORY_ITEMS.find(i=>i.id===id)?.name).filter(Boolean);
+      .filter(id => INVENTORY_ITEMS.find(i => i.id===id && i.type==="Título"))
+      .map(id => INVENTORY_ITEMS.find(i => i.id===id)?.name).filter(Boolean);
+
+    // Itens a remover: concedidos por conquistas perdidas E não protegidos por conquistas ainda ativas
+    const lostItems       = lost.flatMap(id => ACH_TO_ITEMS[id] || []);
+    const keptByOtherAch  = currentIds.flatMap(id => ACH_TO_ITEMS[id] || []);
+    const itemsToRemove   = lostItems.filter(item => !keptByOtherAch.includes(item));
 
     setProfile(prev => {
       if (!prev) return prev;
+      const newXP   = Math.max(0, prev.xp + gainedXP - lostXP);
+      const newLevel = computeLevel(newXP).level;
       return {
         ...prev,
-        xp:              prev.xp + bonusXP,
-        achievements:    currentIds,                    // reflete estado real
-        inventory_items: [...new Set([...(prev.inventory_items||[]), ...newItems])],
-        titles:          [...new Set([...prev.titles, ...newTitles])],
+        xp:              newXP,
+        level:           newLevel,
+        achievements:    currentIds,
+        inventory_items: [
+          ...new Set([
+            ...(prev.inventory_items || []).filter(i => !itemsToRemove.includes(i)),
+            ...newItems,
+          ])
+        ],
+        titles: [...new Set([...prev.titles, ...newTitles])],
       };
     });
 
     newlyEarned.forEach(id => {
       const a = ACHIEVEMENTS.find(x => x.id === id);
       if (a) addAlert(`Conquista: ${a.name}`, `+${a.xp} XP · ${a.grade}`, "success");
+    });
+    lost.forEach(id => {
+      const a = ACHIEVEMENTS.find(x => x.id === id);
+      if (a && a.xp > 0) addAlert(`Conquista revertida: ${a.name}`, `-${a.xp} XP`, "warning");
     });
   }, [profile?.streak, profile?.level, profile?.stats?.FOR, profile?.stats?.INT,
       JSON.stringify(Object.keys(questLog)), countTotalTasks(questLog)]);
@@ -187,10 +235,10 @@ function App() {
     saveProfile(merged);
     if (syncTimer) clearTimeout(syncTimer);
     if (isOnline && session) {
-      const t = setTimeout(() => syncToSupabase(merged, session.user.id), 2000);
+      const t = setTimeout(() => syncToSupabase(merged, session.user.id, missionsGranted), 2000);
       setSyncTimer(t);
     }
-  }, [profile, questLog]);
+  }, [profile, questLog, missionsGranted]);
 
   // ── Helpers ──────────────────────────────────────────────────
   const addAlert = useCallback((msg, sub, type = "info") => {
@@ -208,43 +256,42 @@ function App() {
     const today = todayKey();
     const yest  = yesterdayKey();
 
-    // Lê dos REFS (sempre atuais) — não da closure, que pode estar stale
-    // quando React 18 agrupa eventos de clique rápidos no mesmo batch.
+    // Lê dos REFS (sempre atuais — imune ao batching do React 18)
     const ql = questLogRef.current;
-    const mg = missionsGrantedRef.current;
 
-    const rawVal         = (ql[today]?.[questId] || {})[taskId];
-    const isDone         = !!rawVal;
-    const storedXP       = typeof rawVal === "number" ? rawVal : 0;
-    const grantedList    = mg.date === today ? mg.granted : [];
-    const alreadyGranted = grantedList.includes(taskId);
+    const rawVal      = (ql[today]?.[questId] || {})[taskId];
+    const isDone      = _taskDone(rawVal);
+    const xpWasGiven  = _xpGrantedToday(rawVal);
+    const storedXP    = typeof rawVal === "number" ? rawVal : 0;
 
-    const effectiveXP = (!isDone && !alreadyGranted)
+    const effectiveXP = (!isDone && !xpWasGiven)
       ? (profile?.is_premium ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP)
       : 0;
 
-    // Calcula novos valores
-    const newTaskVal  = isDone ? false : (effectiveXP || true);
-    const newDayLog   = { ...(ql[today] || {}), [questId]: { ...((ql[today]?.[questId]) || {}), [taskId]: newTaskVal } };
-    const newQL       = { ...ql, [today]: newDayLog };
-    const newGranted  = (!isDone && !alreadyGranted) ? [...grantedList, taskId] : grantedList;
-    const newMG       = { date: today, granted: newGranted };
+    const newTaskVal = isDone
+      ? (storedXP > 0 ? "granted" : false)
+      : (effectiveXP > 0 ? effectiveXP : true);
 
-    // Atualiza refs IMEDIATAMENTE — cliques subsequentes antes do re-render
-    // já verão o estado correto sem esperar pelo setState ser processado.
+    const newDayLog = { ...(ql[today] || {}), [questId]: { ...((ql[today]?.[questId]) || {}), [taskId]: newTaskVal } };
+    const newQL     = { ...ql, [today]: newDayLog };
+
+    const mg         = missionsGrantedRef.current;
+    const grantedList = mg.date === today ? mg.granted : [];
+    const newGranted  = (!isDone && !xpWasGiven && effectiveXP > 0)
+      ? [...grantedList, taskId]
+      : grantedList;
+    const newMG = { date: today, granted: newGranted };
+
     questLogRef.current        = newQL;
     missionsGrantedRef.current = newMG;
 
-    // Propaga para o estado React (causa o re-render)
     setQuestLog(newQL);
     setMissionsGranted(newMG);
 
     setProfile(prev => {
       if (!prev) return prev;
       const newXP    = Math.max(0, prev.xp + (isDone ? -storedXP : effectiveXP));
-      // Nível segue o XP diretamente — sobe ao marcar, desce ao desmarcar
       const newLevel = computeLevel(newXP).level;
-      // Stat e gold só mudam quando há movimento real de XP
       const statDelta = effectiveXP > 0 ? 1 : (isDone && storedXP > 0) ? -1 : 0;
       const newStat   = Math.max(10, (prev.stats[taskStat] || 10) + statDelta);
       const goldDelta = effectiveXP > 0
@@ -265,10 +312,10 @@ function App() {
         streak:      newStreak,
         last_active: newLastActive,
         gold:        Math.max(0, prev.gold + goldDelta),
-        stat_points: prev.stat_points, // não modifica aqui para evitar reset
+        stat_points: prev.stat_points,
       };
     });
-  }, [profile?.is_premium]); // refs não precisam estar no dep array
+  }, [profile?.is_premium]);
 
   // ── Distribuir ponto de atributo ─────────────────────────────
   const handleStatPoint = useCallback((statKey) => {
@@ -330,6 +377,19 @@ function App() {
     setNeedsSetup(false);
     addAlert(`Bem-vindo, ${newProfile.name}!`, "Sua jornada começa agora.", "success");
   }, [session]);
+
+  // ── Ativar premium após pagamento confirmado ─────────────────
+  const handlePremiumActivated = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const remote = await loadFromSupabase(session.user.id);
+    if (remote) {
+      setProfile(prev => prev ? { ...prev, is_premium: true,
+        premium_expires_at: remote.premium_expires_at,
+        streak_shields: SHIELDS_PREMIUM } : prev);
+      saveProfile({ ...(remote), quest_log: questLog });
+    }
+    addAlert("⚜ Premium Ativado!", "Todas as funcionalidades desbloqueadas.", "success");
+  }, [session, questLog]);
 
   const handleLogout = useCallback(async () => {
     if (window.sb) await window.sb.auth.signOut();
@@ -395,7 +455,17 @@ function App() {
       <Background />
 
       {/* Premium modal */}
-      {showPremium && <PremiumModal profile={profile} questLog={questLog} onClose={() => setShowPremium(false)} />}
+      {showPremium && (
+        <PremiumModal
+          profile={profile}
+          questLog={questLog}
+          userId={session?.user?.id}
+          userEmail={session?.user?.email}
+          onClose={() => { setShowPremium(false); setPendingPaymentId(null); }}
+          onPremiumActivated={handlePremiumActivated}
+          pendingPaymentId={pendingPaymentId}
+        />
+      )}
 
       {/* Reset de senha */}
       {showPassReset && <PasswordResetModal onClose={() => setShowPassReset(false)} />}

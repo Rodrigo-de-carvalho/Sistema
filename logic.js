@@ -40,10 +40,8 @@ function getRankForLevel(level) {
   return "E";
 }
 
-// XP necessário para subir do nível l para l+1 (espelha computeLevel: req = level * 200)
 function xpForLevel(l) { return l * 200; }
 
-// XP mínimo acumulado para estar no início de um nível (floor do nível)
 function xpFloorForLevel(level) {
   let accum = 0;
   for (let l = 1; l < level; l++) accum += xpForLevel(l);
@@ -51,13 +49,28 @@ function xpFloorForLevel(level) {
 }
 
 // ── Quest helpers ────────────────────────────────────────────────
+
+// Valores possíveis em questLog[date][questId][taskId]:
+//   undefined / false  → nunca marcada ou desmarcada sem XP
+//   number > 0         → marcada E XP foi concedido (o número É o XP)
+//   true               → marcada sem XP (re-marcação após já ter concedido)
+//   "granted"          → desmarcada, mas XP JÁ FOI concedido hoje → não dar novamente
+
+function _taskDone(val) {
+  return val === true || (typeof val === "number" && val > 0);
+}
+
+function _xpGrantedToday(val) {
+  return val === "granted" || (typeof val === "number" && val > 0);
+}
+
 function getDayLog(questLog, date) {
   return questLog[date] || {};
 }
 
 function isTaskDone(questLog, questId, taskId, date) {
   const day = getDayLog(questLog, date || todayKey());
-  return !!(day[questId] && day[questId][taskId]);
+  return _taskDone((day[questId] || {})[taskId]);
 }
 
 function isQuestComplete(questLog, questId, date) {
@@ -69,7 +82,7 @@ function isQuestComplete(questLog, questId, date) {
 function countTotalTasks(questLog) {
   return Object.values(questLog).reduce((sum, day) =>
     sum + Object.values(day).reduce((s2, q) =>
-      s2 + Object.values(q).filter(Boolean).length, 0), 0);
+      s2 + Object.values(q).filter(_taskDone).length, 0), 0);
 }
 
 function allQuestsDoneToday(questLog) {
@@ -80,7 +93,7 @@ function getWeeklyProgress(questLog) {
   return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10);
     const day  = questLog[date] || {};
-    const done = Object.values(day).reduce((s, q) => s + Object.values(q).filter(Boolean).length, 0);
+    const done = Object.values(day).reduce((s, q) => s + Object.values(q).filter(_taskDone).length, 0);
     const max  = DAILY_QUESTS.reduce((s, q) => s + q.tasks.length, 0);
     return { date, done, max, pct: Math.round((done / max) * 100) };
   });
@@ -117,21 +130,17 @@ function _achievementChecks(profile, questLog) {
   };
 }
 
-// Retorna conquistas recém-ganhas (ainda não no perfil)
 function checkNewAchievements(profile, questLog) {
   const checks = _achievementChecks(profile, questLog);
   return ACHIEVEMENTS.filter(a => checks[a.id] && !profile.achievements.includes(a.id));
 }
 
-// Retorna o conjunto ATUAL de conquistas merecidas (para sincronizar estado)
 function computeCurrentAchievements(profile, questLog) {
   const checks = _achievementChecks(profile, questLog);
   return ACHIEVEMENTS.filter(a => checks[a.id]).map(a => a.id);
 }
 
 // ── Missions XP Granted ──────────────────────────────────────────
-// Rastreia quais tasks já concederam XP hoje para evitar duplicação.
-// Reseta automaticamente se a data mudou.
 function loadMissionsGranted() {
   const today = todayKey();
   try {
@@ -162,10 +171,10 @@ function saveProfile(profile) {
   } catch {}
 }
 
-async function syncToSupabase(profile, userId) {
+async function syncToSupabase(profile, userId, missionsGranted) {
   if (!window.sb || !userId) return;
   try {
-    const { error } = await window.sb.from("profiles").upsert({
+    const payload = {
       id: userId,
       name:               profile.name,
       avatar:             profile.avatar,
@@ -181,8 +190,20 @@ async function syncToSupabase(profile, userId) {
       inventory_items:    profile.inventory_items,
       quest_log:          pruneQuestLog(profile.quest_log),
       premium_gate_shown: profile.premium_gate_shown,
+      streak_shields:     profile.streak_shields ?? SHIELDS_FREE,
+      shields_month:      profile.shields_month  ?? null,
       updated_at:         new Date().toISOString(),
-    });
+    };
+    if (typeof profile.is_premium === "boolean") {
+      payload.is_premium = profile.is_premium;
+    }
+    if (profile.premium_expires_at) {
+      payload.premium_expires_at = profile.premium_expires_at;
+    }
+    if (missionsGranted) {
+      payload.missions_xp_granted = missionsGranted;
+    }
+    const { error } = await window.sb.from("profiles").upsert(payload);
     if (error) console.warn("[SISTEMA] Sync error:", error.message);
   } catch {}
 }
@@ -192,6 +213,12 @@ async function loadFromSupabase(userId) {
   try {
     const { data, error } = await window.sb.from("profiles").select("*").eq("id", userId).single();
     if (error || !data) return null;
+
+    let isPremium = data.is_premium || false;
+    if (isPremium && data.premium_expires_at) {
+      if (new Date(data.premium_expires_at) < new Date()) isPremium = false;
+    }
+
     return {
       name:               data.name             || DEFAULT_PROFILE.name,
       avatar:             data.avatar           || null,
@@ -207,6 +234,11 @@ async function loadFromSupabase(userId) {
       inventory_items:    data.inventory_items || ["badge_beginner"],
       quest_log:          data.quest_log       || {},
       premium_gate_shown: data.premium_gate_shown || false,
+      is_premium:         isPremium,
+      premium_expires_at: data.premium_expires_at || null,
+      streak_shields:     data.streak_shields  ?? (isPremium ? SHIELDS_PREMIUM : SHIELDS_FREE),
+      shields_month:      data.shields_month   || null,
+      missions_xp_granted: data.missions_xp_granted || {},
     };
   } catch { return null; }
 }
@@ -219,8 +251,6 @@ function pruneQuestLog(questLog) {
 
 // ── Freemium helpers ─────────────────────────────────────────────
 
-// XP ganho neste mês (para calcular o bônus perdido)
-// Lê o valor numérico armazenado na task (novo formato) ou 0 para legados.
 function getMonthXP(questLog) {
   const month = new Date().toISOString().slice(0, 7);
   return Object.entries(questLog)
@@ -228,20 +258,17 @@ function getMonthXP(questLog) {
     .reduce((sum, [, dayLog]) => {
       return sum + Object.values(dayLog).reduce((s, qLog) => {
         return s + Object.values(qLog).reduce((s2, val) => {
-          if (!val) return s2;
-          if (typeof val === "number") return s2 + val;
-          return s2; // legado `true` — XP desconhecido, ignora
+          if (typeof val === "number" && val > 0) return s2 + val;
+          return s2;
         }, 0);
       }, 0);
     }, 0);
 }
 
-// XP que o usuário teria ganho a mais se fosse Premium
 function getPremiumXPLost(questLog) {
   return Math.floor(getMonthXP(questLog) * PREMIUM_XP_BONUS);
 }
 
-// Reseta escudos se for um novo mês
 function resetShieldsIfNewMonth(profile) {
   const currentMonth = new Date().toISOString().slice(0, 7);
   if (profile.shields_month === currentMonth) return profile;
@@ -252,28 +279,24 @@ function resetShieldsIfNewMonth(profile) {
   };
 }
 
-// Verifica se precisa consumir escudo de streak (chamado no carregamento do app)
 function checkStreakShield(profile) {
   const today     = todayKey();
   const yesterday = yesterdayKey();
   if (!profile.last_active) return { profile, shieldUsed: false };
   if (profile.last_active === today || profile.last_active === yesterday) return { profile, shieldUsed: false };
 
-  // Streak quebrou — tem escudo?
   if (profile.streak_shields > 0 && profile.streak > 0) {
     return {
       profile: { ...profile, streak_shields: profile.streak_shields - 1, last_active: yesterday },
       shieldUsed: true,
     };
   }
-  // Sem escudo — reset streak
   return { profile: { ...profile, streak: 0 }, shieldUsed: false };
 }
 
-// Semana atual (segunda-feira)
 function currentWeekKey() {
   const d   = new Date();
-  const day = d.getDay() || 7; // 1=Mon … 7=Sun
+  const day = d.getDay() || 7;
   d.setDate(d.getDate() - (day - 1));
   return d.toISOString().slice(0, 10);
 }
