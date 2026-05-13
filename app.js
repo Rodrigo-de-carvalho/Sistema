@@ -257,34 +257,48 @@ function App() {
     const today = todayKey();
     const yest  = yesterdayKey();
 
-    // Lê dos REFS (sempre atuais) — não da closure, que pode estar stale
-    // quando React 18 agrupa eventos de clique rápidos no mesmo batch.
+    // Lê dos REFS (sempre atuais — imune ao batching do React 18)
     const ql = questLogRef.current;
-    const mg = missionsGrantedRef.current;
 
-    const rawVal         = (ql[today]?.[questId] || {})[taskId];
-    const isDone         = !!rawVal;
-    const storedXP       = typeof rawVal === "number" ? rawVal : 0;
-    const grantedList    = mg.date === today ? mg.granted : [];
-    const alreadyGranted = grantedList.includes(taskId);
+    // Lê o valor atual da task no questLog de hoje:
+    //   number > 0  → marcada, XP concedido (valor = XP)
+    //   true        → marcada, sem XP (re-marcação após já ter concedido)
+    //   "granted"   → desmarcada, mas XP JÁ FOI dado hoje → não conceder de novo
+    //   false/undef → intocada ou desmarcada sem histórico de XP
+    const rawVal      = (ql[today]?.[questId] || {})[taskId];
+    const isDone      = _taskDone(rawVal);
+    const xpWasGiven  = _xpGrantedToday(rawVal);  // inclui "granted" e number > 0
+    const storedXP    = typeof rawVal === "number" ? rawVal : 0;
 
-    const effectiveXP = (!isDone && !alreadyGranted)
+    // XP efetivo: só concede se a tarefa NÃO foi concedida hoje (nem mesmo se desmarcada)
+    const effectiveXP = (!isDone && !xpWasGiven)
       ? (profile?.is_premium ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP)
       : 0;
 
-    // Calcula novos valores
-    const newTaskVal  = isDone ? false : (effectiveXP || true);
-    const newDayLog   = { ...(ql[today] || {}), [questId]: { ...((ql[today]?.[questId]) || {}), [taskId]: newTaskVal } };
-    const newQL       = { ...ql, [today]: newDayLog };
-    const newGranted  = (!isDone && !alreadyGranted) ? [...grantedList, taskId] : grantedList;
-    const newMG       = { date: today, granted: newGranted };
+    // O que salvar no questLog após o toggle:
+    //   desmarcando com XP  → "granted" (preserva histórico anti-dup)
+    //   desmarcando sem XP  → false
+    //   marcando com XP     → effectiveXP (number)
+    //   marcando sem XP     → true
+    const newTaskVal = isDone
+      ? (storedXP > 0 ? "granted" : false)
+      : (effectiveXP > 0 ? effectiveXP : true);
 
-    // Atualiza refs IMEDIATAMENTE — cliques subsequentes antes do re-render
-    // já verão o estado correto sem esperar pelo setState ser processado.
+    const newDayLog = { ...(ql[today] || {}), [questId]: { ...((ql[today]?.[questId]) || {}), [taskId]: newTaskVal } };
+    const newQL     = { ...ql, [today]: newDayLog };
+
+    // Também atualiza missionsGranted (backward compat / multi-aba)
+    const mg         = missionsGrantedRef.current;
+    const grantedList = mg.date === today ? mg.granted : [];
+    const newGranted  = (!isDone && !xpWasGiven && effectiveXP > 0)
+      ? [...grantedList, taskId]
+      : grantedList;
+    const newMG = { date: today, granted: newGranted };
+
+    // Atualiza refs IMEDIATAMENTE
     questLogRef.current        = newQL;
     missionsGrantedRef.current = newMG;
 
-    // Propaga para o estado React (causa o re-render)
     setQuestLog(newQL);
     setMissionsGranted(newMG);
 

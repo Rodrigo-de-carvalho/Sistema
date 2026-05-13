@@ -569,7 +569,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
           const tc       = catColors[q.category] || "var(--text-mid)";
           const dayLog   = questLog[today] || {};
           const qLog     = dayLog[q.id] || {};
-          const done     = q.tasks.filter(t => qLog[t.id]).length;
+          const done     = q.tasks.filter(t => _taskDone(qLog[t.id])).length;
           const total    = q.tasks.length;
           const pct      = Math.round((done / total) * 100);
           const complete = done === total;
@@ -605,7 +605,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
               {/* Tarefas */}
               <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
                 {q.tasks.map(t => {
-                  const isDone = !!qLog[t.id];
+                  const isDone = _taskDone(qLog[t.id]);
                   return (
                     <div key={t.id} onClick={() => onTaskToggle(q.id, t.id, t.xp, t.stat)}
                       style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer",

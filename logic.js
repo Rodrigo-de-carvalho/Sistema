@@ -51,13 +51,28 @@ function xpFloorForLevel(level) {
 }
 
 // ── Quest helpers ────────────────────────────────────────────────
+
+// Valores possíveis em questLog[date][questId][taskId]:
+//   undefined / false  → nunca marcada ou desmarcada sem XP
+//   number > 0         → marcada E XP foi concedido (o número É o XP)
+//   true               → marcada sem XP (re-marcação após já ter concedido)
+//   "granted"          → desmarcada, mas XP JÁ FOI concedido hoje → não dar novamente
+
+function _taskDone(val) {
+  return val === true || (typeof val === "number" && val > 0);
+}
+
+function _xpGrantedToday(val) {
+  return val === "granted" || (typeof val === "number" && val > 0);
+}
+
 function getDayLog(questLog, date) {
   return questLog[date] || {};
 }
 
 function isTaskDone(questLog, questId, taskId, date) {
   const day = getDayLog(questLog, date || todayKey());
-  return !!(day[questId] && day[questId][taskId]);
+  return _taskDone((day[questId] || {})[taskId]);
 }
 
 function isQuestComplete(questLog, questId, date) {
@@ -69,7 +84,7 @@ function isQuestComplete(questLog, questId, date) {
 function countTotalTasks(questLog) {
   return Object.values(questLog).reduce((sum, day) =>
     sum + Object.values(day).reduce((s2, q) =>
-      s2 + Object.values(q).filter(Boolean).length, 0), 0);
+      s2 + Object.values(q).filter(_taskDone).length, 0), 0);
 }
 
 function allQuestsDoneToday(questLog) {
@@ -80,7 +95,7 @@ function getWeeklyProgress(questLog) {
   return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10);
     const day  = questLog[date] || {};
-    const done = Object.values(day).reduce((s, q) => s + Object.values(q).filter(Boolean).length, 0);
+    const done = Object.values(day).reduce((s, q) => s + Object.values(q).filter(_taskDone).length, 0);
     const max  = DAILY_QUESTS.reduce((s, q) => s + q.tasks.length, 0);
     return { date, done, max, pct: Math.round((done / max) * 100) };
   });
@@ -253,9 +268,9 @@ function getMonthXP(questLog) {
     .reduce((sum, [, dayLog]) => {
       return sum + Object.values(dayLog).reduce((s, qLog) => {
         return s + Object.values(qLog).reduce((s2, val) => {
-          if (!val) return s2;
-          if (typeof val === "number") return s2 + val;
-          return s2; // legado `true` — XP desconhecido, ignora
+          // Conta apenas tasks atualmente marcadas com XP numérico
+          if (typeof val === "number" && val > 0) return s2 + val;
+          return s2;
         }, 0);
       }, 0);
     }, 0);
