@@ -1,11 +1,10 @@
 // ── premium.js — Modal de upgrade Premium + Mercado Pago ──────────
 
-// ── Mercado Pago helpers (via Supabase Edge Function p/ evitar CORS) ─
+// ── Mercado Pago helpers (via Supabase Edge Function) ─────────────
 
-const MP_EDGE_URL = `${SUPABASE_URL}/functions/v1/mp-checkout`;
+const MP_EDGE_URL = 'https://pkewogelkjuvqvmhytwr.supabase.co/functions/v1/mp-checkout';
 
-async function createMercadoPagoPreference() {
-  const returnUrl  = window.location.href.split('?')[0];
+async function createMercadoPagoPreference(userEmail) {
   const response = await fetch(MP_EDGE_URL, {
     method: 'POST',
     headers: {
@@ -13,28 +12,14 @@ async function createMercadoPagoPreference() {
       'apikey':        SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     },
-    body: JSON.stringify({ returnUrl }),
+    body: JSON.stringify({ email: userEmail }),
   });
 
   const data = await response.json();
   if (!response.ok || data.error) {
     throw new Error(data.error || `Erro ${response.status} ao criar pagamento`);
   }
-  return data.init_point;
-}
-
-async function verifyMercadoPagoPayment(paymentId) {
-  try {
-    const response = await fetch(`${MP_EDGE_URL}?payment_id=${paymentId}`, {
-      headers: {
-        'apikey':        SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    });
-    if (!response.ok) return false;
-    const data = await response.json();
-    return data.approved === true;
-  } catch { return false; }
+  return data.checkout_url;
 }
 
 async function activatePremiumInSupabase(userId) {
@@ -50,7 +35,7 @@ async function activatePremiumInSupabase(userId) {
 
 // ── PremiumModal ──────────────────────────────────────────────────
 
-function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, pendingPaymentId }) {
+function PremiumModal({ profile, questLog, userId, userEmail, onClose, onPremiumActivated, pendingPaymentId }) {
   const xpLost       = getPremiumXPLost(questLog);
   const monthXP      = getMonthXP(questLog);
   const isMobile     = useIsMobile();
@@ -68,32 +53,26 @@ function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, 
     return () => clearInterval(iv);
   }, [xpLost]);
 
-  // Verificar pagamento pendente ao abrir (retorno do checkout MP)
+  // Ativar premium automaticamente ao abrir modal com pagamento aprovado
   React.useEffect(() => {
     if (!pendingPaymentId) return;
-    handleVerifyPayment(pendingPaymentId);
+    handleActivatePremium();
   }, [pendingPaymentId]);
 
-  const handleVerifyPayment = async (paymentId) => {
+  const handleActivatePremium = async () => {
     setPayState('verifying');
     setPayError('');
-    const isApproved = await verifyMercadoPagoPayment(paymentId);
-    if (isApproved) {
-      const activated = await activatePremiumInSupabase(userId);
-      if (activated) {
-        setPayState('success');
-        onPremiumActivated?.();
-      } else {
-        setPayState('error');
-        setPayError('Pagamento aprovado, mas erro ao ativar. Recarregue a página.');
-      }
+    const activated = await activatePremiumInSupabase(userId);
+    if (activated) {
+      setPayState('success');
+      onPremiumActivated?.();
     } else {
       setPayState('error');
-      setPayError('Pagamento não confirmado. Verifique e tente novamente.');
+      setPayError('Erro ao ativar premium. Recarregue a página ou contate o suporte.');
     }
   };
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (userEmail) => {
     if (!userId) {
       setPayError('Você precisa estar logado para assinar.');
       return;
@@ -101,7 +80,7 @@ function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, 
     setPayState('loading');
     setPayError('');
     try {
-      const checkoutUrl = await createMercadoPagoPreference();
+      const checkoutUrl = await createMercadoPagoPreference(userEmail);
       window.location.href = checkoutUrl;
     } catch (err) {
       setPayError(err.message);
@@ -362,7 +341,7 @@ function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, 
               </div>
 
               <button
-                onClick={handleSubscribe}
+                onClick={() => handleSubscribe(userEmail)}
                 disabled={payState === 'loading'}
                 style={{ width:"100%", maxWidth:400, padding:"14px 0", borderRadius:6,
                   background:"linear-gradient(90deg,rgba(255,215,0,0.2),rgba(155,93,229,0.2),rgba(255,215,0,0.2))",

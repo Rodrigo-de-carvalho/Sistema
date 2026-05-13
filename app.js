@@ -74,13 +74,12 @@ function App() {
 
   // ── Carregamento inicial ─────────────────────────────────────
   useEffect(() => {
-    // Verifica retorno do Mercado Pago (query params na URL)
-    const params = new URLSearchParams(window.location.search);
-    const mpPaymentId = params.get('payment_id');
-    const mpStatus    = params.get('collection_status') || params.get('status');
-    if (mpPaymentId && mpStatus === 'approved') {
+    // Verifica retorno do checkout do Mercado Pago
+    const params        = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment_status');
+    if (paymentStatus === 'approved') {
       window.history.replaceState({}, document.title, window.location.pathname);
-      setPendingPaymentId(mpPaymentId);
+      setPendingPaymentId('approved');  // sinaliza ativação direta
       setShowPremium(true);
     }
 
@@ -477,6 +476,7 @@ function App() {
           profile={profile}
           questLog={questLog}
           userId={session?.user?.id}
+          userEmail={session?.user?.email}
           onClose={() => { setShowPremium(false); setPendingPaymentId(null); }}
           onPremiumActivated={handlePremiumActivated}
           pendingPaymentId={pendingPaymentId}
