@@ -155,7 +155,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_HGkPnjK6IUYFcr09QRSGvw_Kl9f17vw';
 // mova a criação de preferência para um backend/Edge Function.
 const MERCADO_PAGO_PUBLIC_KEY   = 'TEST-ea293ef2-fd27-4de3-ad83-e2af85c57d93';
 const MERCADO_PAGO_ACCESS_TOKEN = 'TEST-6349398197443388-051307-2b5e69d753f7ea67211097ac6bbc331c-2419335185';
-const PREMIUM_PRICE             = 19.90;  // R$
+const PREMIUM_PRICE             = 15.00;  // R$
 
 window.SUPABASE_OK = false;
 window.sb = null;
