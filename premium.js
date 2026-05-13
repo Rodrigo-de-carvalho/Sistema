@@ -1,49 +1,39 @@
 // ── premium.js — Modal de upgrade Premium + Mercado Pago ──────────
 
-// ── Mercado Pago helpers ──────────────────────────────────────────
+// ── Mercado Pago helpers (via Supabase Edge Function p/ evitar CORS) ─
 
-async function createMercadoPagoPreference(userName) {
-  const currentUrl = window.location.href.split('?')[0];
-  const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
+const MP_EDGE_URL = `${SUPABASE_URL}/functions/v1/mp-checkout`;
+
+async function createMercadoPagoPreference() {
+  const returnUrl  = window.location.href.split('?')[0];
+  const response = await fetch(MP_EDGE_URL, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
-      'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+      'apikey':        SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     },
-    body: JSON.stringify({
-      items: [{
-        id:          'sistema_premium_mensal',
-        title:       'SISTEMA Premium — Assinatura Mensal',
-        description: 'Acesso completo a todas as funcionalidades Premium por 1 mês',
-        quantity:    1,
-        currency_id: 'BRL',
-        unit_price:  PREMIUM_PRICE,
-      }],
-      back_urls: {
-        success: currentUrl,
-        failure: currentUrl,
-        pending: currentUrl,
-      },
-      auto_return: 'approved',
-    }),
+    body: JSON.stringify({ returnUrl }),
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || `Erro ${response.status} ao criar preferência de pagamento`);
-  }
   const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(data.error || `Erro ${response.status} ao criar pagamento`);
+  }
   return data.init_point;
 }
 
 async function verifyMercadoPagoPayment(paymentId) {
   try {
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: { 'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}` },
+    const response = await fetch(`${MP_EDGE_URL}?payment_id=${paymentId}`, {
+      headers: {
+        'apikey':        SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
     });
     if (!response.ok) return false;
     const data = await response.json();
-    return data.status === 'approved';
+    return data.approved === true;
   } catch { return false; }
 }
 
@@ -67,7 +57,6 @@ function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, 
   const [count,      setCount]      = React.useState(0);
   const [payState,   setPayState]   = React.useState('idle');  // idle | loading | verifying | success | error
   const [payError,   setPayError]   = React.useState('');
-  const notConfigured = MERCADO_PAGO_ACCESS_TOKEN === 'SEU_ACCESS_TOKEN_AQUI';
 
   // Animação do contador de XP perdido
   React.useEffect(() => {
@@ -105,10 +94,6 @@ function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, 
   };
 
   const handleSubscribe = async () => {
-    if (notConfigured) {
-      setPayError('Configure MERCADO_PAGO_ACCESS_TOKEN em supabase-client.js para ativar pagamentos.');
-      return;
-    }
     if (!userId) {
       setPayError('Você precisa estar logado para assinar.');
       return;
@@ -116,7 +101,7 @@ function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, 
     setPayState('loading');
     setPayError('');
     try {
-      const checkoutUrl = await createMercadoPagoPreference(profile.name);
+      const checkoutUrl = await createMercadoPagoPreference();
       window.location.href = checkoutUrl;
     } catch (err) {
       setPayError(err.message);
@@ -386,7 +371,7 @@ function PremiumModal({ profile, questLog, userId, onClose, onPremiumActivated, 
                   fontFamily:"var(--font-title)", fontSize:14, letterSpacing:3, cursor:"pointer",
                   boxShadow:"0 0 20px rgba(255,215,0,0.15)",
                   opacity: payState === 'loading' ? 0.6 : 1 }}>
-                {notConfigured ? "⚜ ASSINAR PREMIUM (configurar MP)" : "⚜ ASSINAR POR R$ 19,90/MÊS"}
+                ⚜ ASSINAR POR R$ {PREMIUM_PRICE.toFixed(2).replace('.', ',')}/MÊS
               </button>
 
               {payError && (
