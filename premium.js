@@ -5,6 +5,7 @@
 const MP_EDGE_URL = 'https://pkewogelkjuvqvmhytwr.supabase.co/functions/v1/mp-checkout';
 
 async function createMercadoPagoPreference(userEmail) {
+  const returnUrl = window.location.origin + window.location.pathname + '?payment_status=approved';
   const response = await fetch(MP_EDGE_URL, {
     method: 'POST',
     headers: {
@@ -12,7 +13,7 @@ async function createMercadoPagoPreference(userEmail) {
       'apikey':        SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     },
-    body: JSON.stringify({ email: userEmail }),
+    body: JSON.stringify({ email: userEmail, returnUrl }),
   });
 
   const data = await response.json();
@@ -71,7 +72,6 @@ function PremiumModal({ profile, questLog, userId, userEmail, onClose, onPremium
   };
 
   const handleSubscribe = async (userEmail) => {
-    console.log('[SISTEMA] handleSubscribe chamado', { userId, userEmail });
     if (!userId) {
       setPayError('Você precisa estar logado para assinar. Faça login e tente novamente.');
       return;
@@ -79,13 +79,10 @@ function PremiumModal({ profile, questLog, userId, userEmail, onClose, onPremium
     setPayState('loading');
     setPayError('');
     try {
-      console.log('[SISTEMA] Chamando Edge Function MP...', MP_EDGE_URL);
       const checkoutUrl = await createMercadoPagoPreference(userEmail);
-      console.log('[SISTEMA] checkout_url recebido:', checkoutUrl);
-      if (!checkoutUrl) throw new Error('Edge Function não retornou checkout_url. Verifique se a função está deployada.');
+      if (!checkoutUrl) throw new Error('Edge Function não retornou URL de pagamento. Verifique se a função está deployada.');
       window.location.href = checkoutUrl;
     } catch (err) {
-      console.error('[SISTEMA] Erro no pagamento:', err);
       setPayError(err.message);
       setPayState('error');
     }

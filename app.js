@@ -27,15 +27,12 @@ function App() {
   const [syncTimer,         setSyncTimer]          = useState(null);
   const [showPassReset,     setShowPassReset]       = useState(false);
   const [pendingPaymentId,  setPendingPaymentId]    = useState(null);
-  // Missões: lista fixa do dia (calculada uma vez no load) e registro de XP concedido
   const [dailyQuests,     setDailyQuests]      = useState(null);
   const [missionsGranted, setMissionsGranted]  = useState(() => loadMissionsGranted());
   const dailyQuestsSetRef    = React.useRef(false);
-  // Refs sempre atuais — imunes ao batching do React 18 em cliques rápidos
   const questLogRef          = React.useRef({});
   const missionsGrantedRef   = React.useRef(loadMissionsGranted());
 
-  // Mantém refs em sincronia com o estado a cada render
   questLogRef.current        = questLog;
   missionsGrantedRef.current = missionsGranted;
 
@@ -44,7 +41,6 @@ function App() {
     const tick = () => {
       setClock(new Date().toTimeString().slice(0, 8));
       setCountdown(getTimeToMidnight());
-      // Reseta registro de XP concedido quando a data muda
       setMissionsGranted(prev => {
         const today = todayKey();
         if (prev.date !== today) return { date: today, granted: [] };
@@ -74,12 +70,13 @@ function App() {
 
   // ── Carregamento inicial ─────────────────────────────────────
   useEffect(() => {
-    // Verifica retorno do checkout do Mercado Pago
-    const params        = new URLSearchParams(window.location.search);
-    const paymentStatus = params.get('payment_status');
-    if (paymentStatus === 'approved') {
+    // Aceita ?payment_status=approved (nosso param) e ?collection_status=approved (param nativo do MP)
+    const params           = new URLSearchParams(window.location.search);
+    const paymentStatus    = params.get('payment_status');
+    const collectionStatus = params.get('collection_status');
+    if (paymentStatus === 'approved' || collectionStatus === 'approved') {
       window.history.replaceState({}, document.title, window.location.pathname);
-      setPendingPaymentId('approved');  // sinaliza ativação direta
+      setPendingPaymentId('approved');
       setShowPremium(true);
     }
 
@@ -90,12 +87,10 @@ function App() {
       }
     };
 
-    // Mescla missions_xp_granted do Supabase com o do localStorage, preferindo o mais recente
     const mergeMissionsGranted = (remote) => {
       if (!remote) return;
       const local = loadMissionsGranted();
       const today = todayKey();
-      // Usa o registro remoto se for do dia atual e tiver mais entradas
       if (remote.date === today && remote.granted && remote.granted.length >= (local.granted || []).length) {
         setMissionsGranted(remote);
         missionsGrantedRef.current = remote;
@@ -104,7 +99,6 @@ function App() {
     };
 
     (async () => {
-      // 1. Carrega do localStorage
       const cached = loadProfile();
       if (cached) {
         let p = resetShieldsIfNewMonth(cached);
@@ -116,7 +110,6 @@ function App() {
         if (su1) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
       }
 
-      // 2. Verifica sessão Supabase
       if (window.SUPABASE_OK) {
         const { data: { session: sess } } = await window.sb.auth.getSession();
         if (sess) {
@@ -130,10 +123,8 @@ function App() {
             setQuestLog(p2Fixed.quest_log || {});
             initDailyQuests(p2Fixed);
             saveProfile(p2Fixed);
-            // Sincroniza missions_xp_granted do Supabase
             if (remote.missions_xp_granted) {
-              const mg = remote.missions_xp_granted;
-              mergeMissionsGranted(mg);
+              mergeMissionsGranted(remote.missions_xp_granted);
             }
             if (su2) setTimeout(() => addAlert("🛡 Escudo de Streak usado!", "Seu streak foi protegido automaticamente.", "warning"), 1500);
           } else if (!cached) {
@@ -142,7 +133,6 @@ function App() {
         } else if (!cached) {
           setShowAuth(true);
         }
-        // Listener de mudança de auth
         window.sb.auth.onAuthStateChange((event, sess) => {
           setSession(sess);
           if (event === "SIGNED_OUT") {
@@ -163,24 +153,20 @@ function App() {
   // ── Checar conquistas quando perfil ou log mudam ─────────────
   useEffect(() => {
     if (!profile) return;
-    // Conquistas que merecem ser ganhas AGORA (baseado no estado atual)
     const currentIds  = computeCurrentAchievements(profile, questLog);
     const newlyEarned = currentIds.filter(id => !profile.achievements.includes(id));
     const lost        = profile.achievements.filter(id => !currentIds.includes(id));
 
     if (newlyEarned.length === 0 && lost.length === 0) return;
 
-    // XP ganho com novas conquistas e XP a devolver das perdidas
     const gainedXP = newlyEarned.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
     const lostXP   = lost.reduce((s, id) => s + (ACHIEVEMENTS.find(a=>a.id===id)?.xp||0), 0);
 
-    // Itens concedidos pelas novas conquistas
     const newItems  = newlyEarned.flatMap(id => ACH_TO_ITEMS[id] || []);
     const newTitles = newItems
       .filter(id => INVENTORY_ITEMS.find(i => i.id===id && i.type==="Título"))
       .map(id => INVENTORY_ITEMS.find(i => i.id===id)?.name).filter(Boolean);
 
-    // Itens a remover: concedidos por conquistas perdidas E não protegidos por conquistas ainda ativas
     const lostItems       = lost.flatMap(id => ACH_TO_ITEMS[id] || []);
     const keptByOtherAch  = currentIds.flatMap(id => ACH_TO_ITEMS[id] || []);
     const itemsToRemove   = lostItems.filter(item => !keptByOtherAch.includes(item));
@@ -256,7 +242,6 @@ function App() {
     const today = todayKey();
     const yest  = yesterdayKey();
 
-    // Lê dos REFS (sempre atuais — imune ao batching do React 18)
     const ql = questLogRef.current;
 
     const rawVal      = (ql[today]?.[questId] || {})[taskId];
@@ -406,7 +391,6 @@ function App() {
     if (!window.SUPABASE_OK) setNeedsSetup(true);
   }, []);
 
-  // ── Weekly progress + XP perdido sem premium (memorizados) ──
   const weeklyProgress = useMemo(() => getWeeklyProgress(questLog), [questLog]);
   const xpLost         = useMemo(() => getPremiumXPLost(questLog),  [questLog]);
 
@@ -454,7 +438,6 @@ function App() {
     <div style={{ width:"100%", height:"100%", position:"relative", overflow:"hidden" }}>
       <Background />
 
-      {/* Premium modal */}
       {showPremium && (
         <PremiumModal
           profile={profile}
@@ -467,10 +450,8 @@ function App() {
         />
       )}
 
-      {/* Reset de senha */}
       {showPassReset && <PasswordResetModal onClose={() => setShowPassReset(false)} />}
 
-      {/* Alertas */}
       <div style={{ position:"fixed", top: isMobile?50:70, right: isMobile?8:20, zIndex:9999,
         display:"flex", flexDirection:"column", gap:8, maxWidth: isMobile?"calc(100vw - 16px)":360 }}>
         {alerts.map(a => (
@@ -481,12 +462,10 @@ function App() {
 
       <div style={{ position:"relative", zIndex:1, height:"100%", display:"flex", flexDirection:"column" }}>
 
-        {/* Top bar */}
         <div style={{ height:isMobile?44:52, background:"rgba(5,5,15,0.95)", borderBottom:"1px solid var(--border-dim)",
           display:"flex", alignItems:"center", padding: isMobile?"0 12px":"0 24px",
           backdropFilter:"blur(8px)", flexShrink:0 }}>
 
-          {/* Logo */}
           <div style={{ display:"flex", alignItems:"center", gap:12, marginRight:32 }}>
             <div style={{ width:28, height:28, borderRadius:3,
               background:"linear-gradient(135deg,var(--purple-dim),var(--blue-dim))",
@@ -497,7 +476,6 @@ function App() {
               color:"var(--text-bright)", letterSpacing:2, animation:"flicker 15s ease infinite" }}>SISTEMA</div>
           </div>
 
-          {/* Abas — desktop only */}
           {!isMobile && (
             <div style={{ display:"flex", gap:2, flex:1 }}>
               {TABS_CFG.map(t => (
@@ -523,13 +501,11 @@ function App() {
           )}
           {isMobile && <div style={{ flex:1 }} />}
 
-          {/* Direita: relógio, alertas, rank, logout */}
           <div style={{ display:"flex", alignItems:"center", gap: isMobile?10:16 }}>
             {!isMobile && (
               <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)" }}>{clock}</div>
             )}
 
-            {/* Indicador online/offline */}
             <div style={{ display:"flex", alignItems:"center", gap:5 }}>
               <div style={{ width:6, height:6, borderRadius:"50%",
                 background: isOnline?"var(--green-core)":"var(--red-core)",
@@ -541,7 +517,6 @@ function App() {
               )}
             </div>
 
-            {/* Alertas */}
             {alerts.length > 0 && (
               <div style={{ display:"flex", alignItems:"center", gap:4 }}>
                 <Icon name="bell" size={14} color="var(--gold-core)" />
@@ -552,7 +527,6 @@ function App() {
               </div>
             )}
 
-            {/* Botão Premium */}
             {!profile.is_premium && (
               <button onClick={() => setShowPremium(true)} style={{ background:"linear-gradient(90deg,rgba(255,215,0,0.12),rgba(155,93,229,0.12))",
                 border:"1px solid rgba(255,215,0,0.35)", color:"var(--gold-core)",
@@ -563,7 +537,6 @@ function App() {
               </button>
             )}
 
-            {/* Rank */}
             {!isMobile && (
               <div style={{ background:"rgba(155,93,229,0.12)", border:"1px solid rgba(155,93,229,0.35)",
                 color: RANK_COLORS[dispRank], padding:"4px 12px", borderRadius:3,
@@ -571,7 +544,6 @@ function App() {
                 animation:"rank-glow 3s ease infinite" }}>RANK {dispRank}</div>
             )}
 
-            {/* Logout */}
             <button onClick={handleLogout} title="Sair"
               style={{ background:"none", border:"none", color:"var(--text-dim)",
                 cursor:"pointer", padding:4, display:"flex", alignItems:"center",
@@ -581,12 +553,10 @@ function App() {
           </div>
         </div>
 
-        {/* Conteúdo */}
         <div style={{ flex:1, overflow:"auto", padding: isMobile ? "12px 12px 72px" : 20 }}>
           {tabContent[tab]}
         </div>
 
-        {/* Bottom bar — desktop */}
         {!isMobile && (
           <div style={{ height:28, background:"rgba(3,3,12,0.98)", borderTop:"1px solid var(--border-dim)",
             display:"flex", alignItems:"center", padding:"0 20px", gap:24, flexShrink:0 }}>
@@ -605,7 +575,6 @@ function App() {
           </div>
         )}
 
-        {/* Bottom nav — mobile */}
         {isMobile && (
           <div style={{ position:"fixed", bottom:0, left:0, right:0, height:58,
             background:"rgba(3,3,12,0.97)", borderTop:"1px solid var(--border-dim)",
