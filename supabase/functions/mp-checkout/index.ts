@@ -1,15 +1,14 @@
 // Supabase Edge Function — Mercado Pago Checkout
-// Deploy: supabase functions deploy mp-checkout
+// Deploy: supabase functions deploy mp-checkout --no-verify-jwt
 // Secrets: supabase secrets set MP_ACCESS_TOKEN=<seu_token>
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   const url = new URL(req.url);
@@ -18,8 +17,8 @@ serve(async (req) => {
     const accessToken = Deno.env.get("MP_ACCESS_TOKEN");
     if (!accessToken) throw new Error("MP_ACCESS_TOKEN não configurado");
 
-    // ── POST /mp-checkout → cria preferência ──────────────────────
-    if (req.method === "POST" && url.pathname.endsWith("/mp-checkout")) {
+    // ── POST → cria preferência ───────────────────────────────────
+    if (req.method === "POST") {
       const { returnUrl } = await req.json();
 
       const price = parseFloat(Deno.env.get("MP_PRICE") || "15.00");
@@ -60,7 +59,7 @@ serve(async (req) => {
       );
     }
 
-    // ── GET /mp-checkout?payment_id=xxx → verifica pagamento ──────
+    // ── GET ?payment_id=xxx → verifica pagamento ──────────────────
     if (req.method === "GET") {
       const paymentId = url.searchParams.get("payment_id");
       if (!paymentId) throw new Error("payment_id obrigatório");
