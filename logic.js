@@ -132,13 +132,11 @@ function countCompletedWeeklyQuests(weeklyLog) {
 }
 
 // ── Conquistas ───────────────────────────────────────────────────
-
-// Conquistas de marco histórico: uma vez obtidas, nunca são revogadas.
-// As demais (streak, nível, atributos) refletem o estado atual e podem regredir.
-const PERMANENT_ACHIEVEMENTS = new Set([
-  "first_task", "first_quest", "all_quests_day", "tasks_50", "tasks_100",
-  "prem_all_weekly", "prem_badge",
-]);
+// Regra: uma conquista obtida HOJE acompanha o estado — se o jogador
+// desmarcar a tarefa que a concedeu (clique sem querer), ela é revogada
+// junto com XP, itens e título. A partir do dia seguinte ela "congela"
+// e vira permanente, para nunca sumir sozinha quando o histórico de
+// 30 dias for podado ou o streak quebrar.
 
 function _achievementChecks(profile, questLog) {
   const total  = countTotalTasks(questLog);
@@ -171,8 +169,11 @@ function _achievementChecks(profile, questLog) {
 function computeCurrentAchievements(profile, questLog) {
   const checks = _achievementChecks(profile, questLog);
   const owned  = profile.achievements || [];
+  const dates  = profile.achievements_dates || {};
+  const today  = todayKey();
+  // Sem data registrada (conta antiga) conta como dia anterior → permanente.
   return ALL_ACHIEVEMENTS
-    .filter(a => checks[a.id] || (PERMANENT_ACHIEVEMENTS.has(a.id) && owned.includes(a.id)))
+    .filter(a => checks[a.id] || (owned.includes(a.id) && dates[a.id] !== today))
     .map(a => a.id);
 }
 
@@ -190,6 +191,7 @@ function loadProfile() {
       stats: { ...DEFAULT_PROFILE.stats, ...(p.stats || {}) },
       quest_log:  p.quest_log  || {},
       weekly_log: p.weekly_log || {},
+      achievements_dates: p.achievements_dates || {},
     };
   } catch { return null; }
 }
@@ -216,6 +218,7 @@ async function syncToSupabase(profile, userId) {
       gold:               profile.gold,
       titles:             profile.titles,
       achievements:       profile.achievements,
+      achievements_dates: profile.achievements_dates || {},
       inventory_items:    profile.inventory_items,
       quest_log:          pruneQuestLog(profile.quest_log || {}),
       weekly_log:         pruneWeeklyLog(profile.weekly_log || {}),
@@ -254,6 +257,7 @@ async function loadFromSupabase(userId) {
       gold:               data.gold            || 0,
       titles:             data.titles          || ["Iniciante"],
       achievements:       data.achievements    || [],
+      achievements_dates: data.achievements_dates || {},
       inventory_items:    data.inventory_items || ["badge_beginner"],
       quest_log:          data.quest_log       || {},
       weekly_log:         data.weekly_log      || {},

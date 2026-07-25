@@ -473,6 +473,7 @@ const DEFAULT_PROFILE = {
   gold: 0,
   titles: ["Iniciante"],
   achievements: [],
+  achievements_dates: {},   // id da conquista → "YYYY-MM-DD" em que foi obtida
   inventory_items: ["badge_beginner"],
   quest_log: {},
   weekly_log: {},

@@ -142,23 +142,37 @@ function App() {
     const keptByOtherAch  = currentIds.flatMap(id => ACH_TO_ITEMS[id] || []);
     const itemsToRemove   = lostItems.filter(item => !keptByOtherAch.includes(item));
 
+    // Títulos acompanham a conquista: desfazer a conquista do dia
+    // remove também o título que veio junto
+    const removedTitleNames = itemsToRemove
+      .map(id => INVENTORY_ITEMS.find(i => i.id === id))
+      .filter(i => i && i.type === "Título")
+      .map(i => i.name);
+
     setProfile(prev => {
       if (!prev) return prev;
       const newXP    = Math.max(0, prev.xp + gainedXP - lostXP);
       const newLevel = computeLevel(newXP).level;
+      const newDates = { ...(prev.achievements_dates || {}) };
+      newlyEarned.forEach(id => { newDates[id] = todayKey(); });
+      lost.forEach(id => { delete newDates[id]; });
       return {
         ...prev,
-        xp:              newXP,
-        level:           newLevel,
-        stat_points:     adjustStatPoints(prev.stat_points, prev.level, newLevel, prev.is_premium),
-        achievements:    currentIds,
+        xp:                 newXP,
+        level:              newLevel,
+        stat_points:        adjustStatPoints(prev.stat_points, prev.level, newLevel, prev.is_premium),
+        achievements:       currentIds,
+        achievements_dates: newDates,
         inventory_items: [
           ...new Set([
             ...(prev.inventory_items || []).filter(i => !itemsToRemove.includes(i)),
             ...newItems,
           ])
         ],
-        titles: [...new Set([...prev.titles, ...newTitles])],
+        titles: [...new Set([
+          ...prev.titles.filter(t => !removedTitleNames.includes(t)),
+          ...newTitles,
+        ])],
       };
     });
 
