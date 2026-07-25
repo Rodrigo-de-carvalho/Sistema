@@ -330,6 +330,16 @@ function App() {
     }, 0);
   }, []);
 
+  // ── Timer de tarefa (marca sozinha quando o tempo termina) ───
+  const handleTimerComplete = useCallback((t) => {
+    const ql   = questLogRef.current;
+    const done = _taskDone((ql[todayKey()]?.[t.questId] || {})[t.taskId]);
+    if (!done) handleTaskToggle(t.questId, t.taskId, t.taskXP, t.taskStat);
+    addAlert("⏱ Tempo cumprido!", `${t.label} — tarefa concluída.`, "success");
+  }, [handleTaskToggle, addAlert]);
+
+  const taskTimer = useTaskTimer(handleTimerComplete);
+
   // ── Distribuir ponto de atributo ─────────────────────────────
   const handleStatPoint = useCallback((statKey) => {
     setProfile(prev => {
@@ -408,6 +418,8 @@ function App() {
     if (window.sb) await window.sb.auth.signOut();
     localStorage.removeItem("sistema_profile");
     localStorage.removeItem("sistema_missions_xp");
+    localStorage.removeItem("sistema_task_timer");
+    taskTimer.cancel();
     setProfile(null); setQuestLog({}); setSession(null);
     questLogRef.current = {};
     setDailyQuests(null);
@@ -453,7 +465,8 @@ function App() {
     quests:       <QuestsTab      questLog={questLog} onTaskToggle={handleTaskToggle}
                                   weeklyLog={profile.weekly_log || {}} onWeeklyToggle={handleWeeklyTaskToggle}
                                   isPremium={!!profile.is_premium} onShowPremium={() => setShowPremium(true)}
-                                  quests={dailyQuests || DAILY_QUESTS} currentRank={questRank} />,
+                                  quests={dailyQuests || DAILY_QUESTS} currentRank={questRank}
+                                  taskTimer={taskTimer} />,
     inventory:    <InventoryTab   profile={profile} />,
     achievements: <AchievementsTab profile={profile} />,
     social:       <SocialTab myId={session?.user?.id} myName={profile.name}

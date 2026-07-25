@@ -493,7 +493,7 @@ function SkillsTab({ profile }) {
 }
 
 // ── MISSÕES ───────────────────────────────────────────────────────
-function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremium, onShowPremium, quests, currentRank }) {
+function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremium, onShowPremium, quests, currentRank, taskTimer }) {
   const [filter, setFilter] = React.useState("Todas");
   const [verify, setVerify] = React.useState(null); // { type:'camera'|'strava', quest, task, target }
   const today    = todayKey();
@@ -518,6 +518,31 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
       {verify?.type === "strava" && (
         <StravaModal task={verify.task} targetKm={verify.target}
           onVerified={handleVerified} onClose={() => setVerify(null)} />
+      )}
+      {verify?.type === "timer" && (
+        <TimerModal quest={verify.quest} task={verify.task} minutes={verify.target}
+          timer={taskTimer} onClose={() => setVerify(null)} />
+      )}
+
+      {/* Banner do timer em andamento */}
+      {taskTimer?.active && verify?.type !== "timer" && (
+        <div onClick={() => {
+            const a = taskTimer.active;
+            const q = list.find(x => x.id === a.questId);
+            const t = q?.tasks.find(x => x.id === a.taskId);
+            if (q && t) setVerify({ type:"timer", quest:q, task:t, target:a.totalMin });
+          }}
+          style={{ cursor:"pointer", marginBottom:12, padding:"10px 14px",
+            background:"rgba(0,255,136,0.06)", border:"1px solid rgba(0,255,136,0.3)",
+            borderRadius:6, display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:16 }}>⏱</span>
+          <span style={{ flex:1, color:"var(--text-mid)", fontSize:12 }}>
+            {taskTimer.active.label}
+          </span>
+          <span style={{ color:"var(--green-core)", fontFamily:"var(--font-mono)", fontSize:14 }}>
+            {formatTimerSec(taskTimer.remainingSec)}
+          </span>
+        </div>
       )}
       {/* Badge do rank atual */}
       {currentRank && (
@@ -631,6 +656,19 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
                               color:"#ff8a5c", fontSize:10, padding:"3px 8px", borderRadius:3,
                               cursor:"pointer", fontFamily:"var(--font-title)", letterSpacing:1, flexShrink:0 }}>
                             🏃 GPS
+                          </button>
+                        )}
+                        {!isDone && TIMER_TASKS[t.id] && (
+                          <button title="Rodar timer — a tarefa marca sozinha ao terminar"
+                            onClick={e => { e.stopPropagation();
+                              setVerify({ type:"timer", quest:q, task:t, target: parseMinutesTarget(t.label) }); }}
+                            style={{ background: taskTimer?.active?.taskId === t.id && taskTimer?.active?.questId === q.id
+                                ? "rgba(0,255,136,0.18)" : "rgba(0,255,136,0.08)",
+                              border:"1px solid rgba(0,255,136,0.4)",
+                              color:"var(--green-core)", fontSize:10, padding:"3px 8px", borderRadius:3,
+                              cursor:"pointer", fontFamily:"var(--font-title)", letterSpacing:1, flexShrink:0 }}>
+                            {taskTimer?.active?.taskId === t.id && taskTimer?.active?.questId === q.id
+                              ? `⏱ ${formatTimerSec(taskTimer.remainingSec)}` : "⏱ TIMER"}
                           </button>
                         )}
                         <span style={{ color:"var(--purple-glow)", fontSize:10, fontFamily:"var(--font-mono)" }}>+{t.xp} XP</span>
