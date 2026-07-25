@@ -495,14 +495,30 @@ function SkillsTab({ profile }) {
 // ── MISSÕES ───────────────────────────────────────────────────────
 function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremium, onShowPremium, quests, currentRank }) {
   const [filter, setFilter] = React.useState("Todas");
+  const [verify, setVerify] = React.useState(null); // { type:'camera'|'strava', quest, task, target }
   const today    = todayKey();
   const list     = quests || DAILY_QUESTS;
   const catColors = { "Força":"#ff6644","Agilidade":"#00d4ff","Inteligência":"#9b5de5","Vitalidade":"#ff4466","Percepção":"#ffd700" };
   const filters  = ["Todas", ...list.map(q => q.category)];
   const shown    = filter === "Todas" ? list : list.filter(q => q.category === filter);
 
+  const handleVerified = () => {
+    if (!verify) return;
+    const dayLog = questLog[today] || {};
+    const alreadyDone = _taskDone((dayLog[verify.quest.id] || {})[verify.task.id]);
+    if (!alreadyDone) onTaskToggle(verify.quest.id, verify.task.id, verify.task.xp, verify.task.stat);
+  };
+
   return (
     <div style={{ animation:"appear-up 0.15s ease" }}>
+      {verify?.type === "camera" && (
+        <TrainerModal task={verify.task} target={verify.target}
+          onVerified={handleVerified} onClose={() => setVerify(null)} />
+      )}
+      {verify?.type === "strava" && (
+        <StravaModal task={verify.task} targetKm={verify.target}
+          onVerified={handleVerified} onClose={() => setVerify(null)} />
+      )}
       {/* Badge do rank atual */}
       {currentRank && (
         <div style={{ marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
@@ -596,7 +612,27 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
                         fontFamily:"var(--font-body)", textDecoration: isDone?"line-through":"none" }}>
                         {t.label}
                       </span>
-                      <div style={{ display:"flex", gap:8 }}>
+                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                        {!isDone && CAMERA_TASKS[t.id] && (
+                          <button title="Verificar com a câmera (IA conta as repetições)"
+                            onClick={e => { e.stopPropagation();
+                              setVerify({ type:"camera", quest:q, task:t, target: parseRepTarget(t.label) }); }}
+                            style={{ background:"rgba(0,212,255,0.1)", border:"1px solid rgba(0,212,255,0.35)",
+                              color:"var(--cyan-core)", fontSize:10, padding:"3px 8px", borderRadius:3,
+                              cursor:"pointer", fontFamily:"var(--font-title)", letterSpacing:1, flexShrink:0 }}>
+                            📷 IA
+                          </button>
+                        )}
+                        {!isDone && STRAVA_TASKS[t.id] && (
+                          <button title="Verificar com o GPS do Strava"
+                            onClick={e => { e.stopPropagation();
+                              setVerify({ type:"strava", quest:q, task:t, target: parseKmTarget(t.label) }); }}
+                            style={{ background:"rgba(252,76,2,0.1)", border:"1px solid rgba(252,76,2,0.4)",
+                              color:"#ff8a5c", fontSize:10, padding:"3px 8px", borderRadius:3,
+                              cursor:"pointer", fontFamily:"var(--font-title)", letterSpacing:1, flexShrink:0 }}>
+                            🏃 GPS
+                          </button>
+                        )}
                         <span style={{ color:"var(--purple-glow)", fontSize:10, fontFamily:"var(--font-mono)" }}>+{t.xp} XP</span>
                         <span style={{ color: STAT_META.find(s=>s.key===t.stat)?.color||"var(--text-dim)",
                           fontSize:10, fontFamily:"var(--font-mono)" }}>{t.stat}+1</span>

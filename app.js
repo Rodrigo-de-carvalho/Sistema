@@ -65,10 +65,13 @@ function App() {
   useEffect(() => {
     // Retorno do Mercado Pago: exige payment_id + status aprovado.
     // A ativação real é verificada no servidor (Edge Function).
-    const params    = new URLSearchParams(window.location.search);
-    const payId     = params.get("payment_id") || params.get("collection_id");
-    const payStatus = params.get("collection_status") || params.get("status") || params.get("payment_status");
-    if (payStatus) {
+    const params     = new URLSearchParams(window.location.search);
+    const payId      = params.get("payment_id") || params.get("collection_id");
+    const payStatus  = params.get("collection_status") || params.get("status") || params.get("payment_status");
+    // Retorno do OAuth do Strava (?strava=1&code=...)
+    const stravaFlag = params.get("strava");
+    const stravaCode = params.get("code");
+    if (payStatus || stravaFlag) {
       window.history.replaceState({}, document.title, window.location.pathname);
       if (payId && payStatus === "approved") {
         setPendingPaymentId(payId);
@@ -93,6 +96,11 @@ function App() {
         const { data: { session: sess } } = await window.sb.auth.getSession();
         if (sess) {
           setSession(sess);
+          if (stravaFlag === "1" && stravaCode) {
+            const r = await stravaExchangeCode(stravaCode);
+            if (r.error) setTimeout(() => addAlert("Strava: falha ao conectar", r.error, "warning"), 800);
+            else setTimeout(() => addAlert("🏃 Strava conectado!", "Suas corridas agora podem ser verificadas pelo GPS.", "success"), 800);
+          }
           const remote = await loadFromSupabase(sess.user.id);
           if (remote) {
             applyLoaded(remote, true);
