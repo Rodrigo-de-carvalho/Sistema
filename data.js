@@ -366,11 +366,6 @@ function getQuestsForRank(rank) {
   return RANK_QUESTS[rank] || RANK_QUESTS.B;
 }
 
-// Mapa de todas as tasks por ID (usa Rank E como baseline para fallback legacy)
-const ALL_TASKS_MAP = Object.values(RANK_QUESTS)
-  .flatMap(qs => qs.flatMap(q => q.tasks))
-  .reduce((m, t) => { if (!m[t.id]) m[t.id] = t; return m; }, {});
-
 // Alias backward-compat: Rank B corresponde ao nível original das missões
 const DAILY_QUESTS = RANK_QUESTS.B;
 
@@ -417,10 +412,6 @@ const INVENTORY_ITEMS = [
 const ACH_TO_ITEMS = INVENTORY_ITEMS
   .filter(i => i.unlockBy)
   .reduce((m, i) => ({ ...m, [i.unlockBy]: [...(m[i.unlockBy] || []), i.id] }), {});
-
-// achievement → skill desbloqueada
-const ACH_TO_SKILL = SKILLS
-  .reduce((m, s) => ({ ...m, [s.unlockBy]: s.id }), {});
 
 // ── Missões semanais (Premium) ────────────────────────────────────
 const WEEKLY_QUESTS = [

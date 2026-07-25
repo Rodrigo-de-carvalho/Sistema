@@ -3,11 +3,16 @@ const { useState: useSt, useEffect: useEff, useRef, useCallback: useCb } = React
 
 // ── Supabase helpers ──────────────────────────────────────────────
 
+// Leituras públicas usam a view public_profiles (colunas limitadas por
+// segurança: id, name, level, xp, streak — nada de quest_log/avatar/etc).
+
 async function sbSearchUsers(query) {
-  if (!window.sb || !query.trim()) return [];
-  const { data } = await window.sb.from("profiles")
+  // remove curingas de LIKE e caracteres de sintaxe de filtro do PostgREST
+  const clean = query.trim().replace(/[%_(),]/g, "");
+  if (!window.sb || !clean) return [];
+  const { data } = await window.sb.from("public_profiles")
     .select("id,name,level,xp,streak")
-    .ilike("name", `%${query.trim()}%`)
+    .ilike("name", `%${clean}%`)
     .limit(20);
   return data || [];
 }
@@ -22,7 +27,7 @@ async function sbGetFriendships(myId) {
 
 async function sbGetProfiles(ids) {
   if (!window.sb || !ids.length) return [];
-  const { data } = await window.sb.from("profiles")
+  const { data } = await window.sb.from("public_profiles")
     .select("id,name,level,xp,streak")
     .in("id", ids);
   return data || [];
@@ -30,7 +35,7 @@ async function sbGetProfiles(ids) {
 
 async function sbGetGlobalRanking() {
   if (!window.sb) return [];
-  const { data } = await window.sb.from("profiles")
+  const { data } = await window.sb.from("public_profiles")
     .select("id,name,level,xp,streak")
     .order("xp", { ascending: false })
     .limit(50);
@@ -72,9 +77,11 @@ async function sbGetMessages(myId, friendId) {
 
 async function sbSendChatMessage(myId, friendId, content) {
   if (!window.sb) return { error: "offline" };
-  const { error } = await window.sb.from("messages")
-    .insert({ sender_id: myId, receiver_id: friendId, content });
-  return { error: error?.message };
+  const { data, error } = await window.sb.from("messages")
+    .insert({ sender_id: myId, receiver_id: friendId, content })
+    .select()
+    .single();
+  return { data, error: error?.message };
 }
 
 // ── Rank helpers ──────────────────────────────────────────────────
@@ -98,11 +105,15 @@ function ChatModal({ myId, friend, onClose }) {
     sbGetMessages(myId, friend.id).then(setMessages);
 
     if (window.sb) {
+      // postgres_changes só aceita filtro simples (coluna=eq.valor);
+      // o remetente é conferido no callback. Mensagens enviadas por mim
+      // são adicionadas localmente no handleSend.
       const ch = window.sb.channel(`chat_${[myId, friend.id].sort().join("_")}`)
         .on("postgres_changes", {
           event: "INSERT", schema: "public", table: "messages",
-          filter: `or(and(sender_id.eq.${myId},receiver_id.eq.${friend.id}),and(sender_id.eq.${friend.id},receiver_id.eq.${myId}))`,
+          filter: `receiver_id=eq.${myId}`,
         }, payload => {
+          if (payload.new.sender_id !== friend.id) return;
           setMessages(prev => {
             if (prev.some(m => m.id === payload.new.id)) return prev;
             const next = [...prev, payload.new];
@@ -130,7 +141,10 @@ function ChatModal({ myId, friend, onClose }) {
     if (!content || sending) return;
     setSending(true);
     setText("");
-    await sbSendChatMessage(myId, friend.id, content);
+    const { data } = await sbSendChatMessage(myId, friend.id, content);
+    if (data) {
+      setMessages(prev => prev.some(m => m.id === data.id) ? prev : [...prev, data].slice(-100));
+    }
     setSending(false);
   }
 
@@ -294,7 +308,7 @@ function RankingRow({ pos, user, myId, onChat }) {
 
 // ── SocialTab ─────────────────────────────────────────────────────
 
-function SocialTab({ myId, myName }) {
+function SocialTab({ myId, myName, myLevel, myXP, myStreak }) {
   const [subTab,       setSubTab]       = useSt("amigos");
   const [friendships,  setFriendships]  = useSt([]);
   const [profiles,     setProfiles]     = useSt({});
@@ -580,7 +594,7 @@ function SocialTab({ myId, myName }) {
                   Adicione amigos para ver o ranking entre vocês!
                 </div>
               ) : (
-                [...friendProfiles, { id: myId, name: myName || "Você", level: 1, xp: 0, streak: 0 }]
+                [...friendProfiles, { id: myId, name: myName || "Você", level: myLevel || 1, xp: myXP || 0, streak: myStreak || 0 }]
                   .sort((a, b) => (b.xp || 0) - (a.xp || 0))
                   .map((u, i) => (
                     <RankingRow key={u.id} pos={i+1} user={u} myId={myId}

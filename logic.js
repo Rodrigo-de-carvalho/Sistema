@@ -1,7 +1,6 @@
 // ── logic.js — funções de jogo e storage ─────────────────────────
 
-const LS_KEY         = "sistema_profile";
-const LS_KEY_MISSIONS = "sistema_missions_xp";
+const LS_KEY = "sistema_profile";
 
 // ── Datas ────────────────────────────────────────────────────────
 const todayKey     = () => new Date().toISOString().slice(0, 10);
@@ -15,6 +14,13 @@ function getTimeToMidnight() {
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
   return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+function currentWeekKey() {
+  const d   = new Date();
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - (day - 1));
+  return d.toISOString().slice(0, 10);
 }
 
 // ── XP / Nível ───────────────────────────────────────────────────
@@ -48,20 +54,29 @@ function xpFloorForLevel(level) {
   return accum;
 }
 
+// Premium: 3 pontos de atributo por nível ganho (removidos ao perder nível)
+function adjustStatPoints(points, prevLevel, newLevel, isPremium) {
+  if (!isPremium || newLevel === prevLevel) return points;
+  return Math.max(0, points + (newLevel - prevLevel) * 3);
+}
+
+// Rank efetivo das missões — free trava no C (Ranks B+ são Premium)
+function effectiveQuestRank(profile) {
+  const rank = getRankForLevel(profile.level);
+  if (profile.is_premium || FREE_RANKS.includes(rank)) return rank;
+  return "C";
+}
+
 // ── Quest helpers ────────────────────────────────────────────────
 
 // Valores possíveis em questLog[date][questId][taskId]:
-//   undefined / false  → nunca marcada ou desmarcada sem XP
-//   number > 0         → marcada E XP foi concedido (o número É o XP)
-//   true               → marcada sem XP (re-marcação após já ter concedido)
-//   "granted"          → desmarcada, mas XP JÁ FOI concedido hoje → não dar novamente
+//   undefined / false  → não marcada
+//   number > 0         → marcada; o número É o XP concedido
+//   true               → marcada (legado antigo, sem XP registrado)
+//   "granted"          → legado antigo; tratado como NÃO marcada
 
 function _taskDone(val) {
   return val === true || (typeof val === "number" && val > 0);
-}
-
-function _xpGrantedToday(val) {
-  return val === "granted" || (typeof val === "number" && val > 0);
 }
 
 function getDayLog(questLog, date) {
@@ -99,22 +114,40 @@ function getWeeklyProgress(questLog) {
   });
 }
 
-// ── Streak ───────────────────────────────────────────────────────
-function computeStreak(lastActive, currentStreak) {
-  const today     = todayKey();
-  const yesterday = yesterdayKey();
-  if (lastActive === today)     return currentStreak;
-  if (lastActive === yesterday) return currentStreak + 1;
-  return 1;
+// ── Missões semanais (Premium) ───────────────────────────────────
+// weeklyLog[weekKey][questId][taskId] segue o mesmo modelo do questLog.
+
+function isWeeklyTaskDone(weeklyLog, questId, taskId, week) {
+  const wk = (weeklyLog || {})[week || currentWeekKey()] || {};
+  return _taskDone((wk[questId] || {})[taskId]);
+}
+
+function isWeeklyQuestComplete(weeklyLog, quest, week) {
+  return quest.tasks.every(t => isWeeklyTaskDone(weeklyLog, quest.id, t.id, week));
+}
+
+function countCompletedWeeklyQuests(weeklyLog) {
+  return Object.keys(weeklyLog || {}).reduce((sum, week) =>
+    sum + WEEKLY_QUESTS.filter(q => isWeeklyQuestComplete(weeklyLog, q, week)).length, 0);
 }
 
 // ── Conquistas ───────────────────────────────────────────────────
+
+// Conquistas de marco histórico: uma vez obtidas, nunca são revogadas.
+// As demais (streak, nível, atributos) refletem o estado atual e podem regredir.
+const PERMANENT_ACHIEVEMENTS = new Set([
+  "first_task", "first_quest", "all_quests_day", "tasks_50", "tasks_100",
+  "prem_all_weekly", "prem_badge",
+]);
+
 function _achievementChecks(profile, questLog) {
-  const total = countTotalTasks(questLog);
-  const rank  = getRankForLevel(profile.level);
+  const total  = countTotalTasks(questLog);
+  const rank   = getRankForLevel(profile.level);
+  const dates  = Object.keys(questLog || {});
+  const isPrem = !!profile.is_premium;
   return {
     first_task:     total >= 1,
-    first_quest:    DAILY_QUESTS.some(q => isQuestComplete(questLog, q.id)),
+    first_quest:    dates.some(d => DAILY_QUESTS.some(q => isQuestComplete(questLog, q.id, d))),
     streak_3:       profile.streak >= 3,
     streak_7:       profile.streak >= 7,
     streak_30:      profile.streak >= 30,
@@ -124,36 +157,23 @@ function _achievementChecks(profile, questLog) {
     rank_c:         ["C","B","A","S","SS","SSS","Nacional"].includes(rank),
     str_30:         profile.stats.FOR >= 30,
     int_30:         profile.stats.INT >= 30,
-    all_quests_day: allQuestsDoneToday(questLog),
+    all_quests_day: dates.some(d => DAILY_QUESTS.every(q => isQuestComplete(questLog, q.id, d))),
     tasks_50:       total >= 50,
     tasks_100:      total >= 100,
+    prem_streak_60:  isPrem && profile.streak >= 60,
+    prem_streak_100: isPrem && profile.streak >= 100,
+    prem_level_20:   isPrem && profile.level >= 20,
+    prem_all_weekly: isPrem && countCompletedWeeklyQuests(profile.weekly_log) >= 4,
+    prem_badge:      isPrem,
   };
-}
-
-function checkNewAchievements(profile, questLog) {
-  const checks = _achievementChecks(profile, questLog);
-  return ACHIEVEMENTS.filter(a => checks[a.id] && !profile.achievements.includes(a.id));
 }
 
 function computeCurrentAchievements(profile, questLog) {
   const checks = _achievementChecks(profile, questLog);
-  return ACHIEVEMENTS.filter(a => checks[a.id]).map(a => a.id);
-}
-
-// ── Missions XP Granted ──────────────────────────────────────────
-function loadMissionsGranted() {
-  const today = todayKey();
-  try {
-    const raw  = localStorage.getItem(LS_KEY_MISSIONS);
-    if (!raw) return { date: today, granted: [] };
-    const data = JSON.parse(raw);
-    if (data.date !== today) return { date: today, granted: [] };
-    return { date: data.date, granted: Array.isArray(data.granted) ? data.granted : [] };
-  } catch { return { date: today, granted: [] }; }
-}
-
-function saveMissionsGranted(record) {
-  try { localStorage.setItem(LS_KEY_MISSIONS, JSON.stringify(record)); } catch {}
+  const owned  = profile.achievements || [];
+  return ALL_ACHIEVEMENTS
+    .filter(a => checks[a.id] || (PERMANENT_ACHIEVEMENTS.has(a.id) && owned.includes(a.id)))
+    .map(a => a.id);
 }
 
 // ── Storage ──────────────────────────────────────────────────────
@@ -161,7 +181,16 @@ function loadProfile() {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== "object") return null;
+    // Sanitiza caches antigos/corrompidos preenchendo campos ausentes
+    return {
+      ...DEFAULT_PROFILE,
+      ...p,
+      stats: { ...DEFAULT_PROFILE.stats, ...(p.stats || {}) },
+      quest_log:  p.quest_log  || {},
+      weekly_log: p.weekly_log || {},
+    };
   } catch { return null; }
 }
 
@@ -171,7 +200,7 @@ function saveProfile(profile) {
   } catch {}
 }
 
-async function syncToSupabase(profile, userId, missionsGranted) {
+async function syncToSupabase(profile, userId) {
   if (!window.sb || !userId) return;
   try {
     const payload = {
@@ -188,21 +217,15 @@ async function syncToSupabase(profile, userId, missionsGranted) {
       titles:             profile.titles,
       achievements:       profile.achievements,
       inventory_items:    profile.inventory_items,
-      quest_log:          pruneQuestLog(profile.quest_log),
+      quest_log:          pruneQuestLog(profile.quest_log || {}),
+      weekly_log:         pruneWeeklyLog(profile.weekly_log || {}),
       premium_gate_shown: profile.premium_gate_shown,
       streak_shields:     profile.streak_shields ?? SHIELDS_FREE,
       shields_month:      profile.shields_month  ?? null,
       updated_at:         new Date().toISOString(),
     };
-    if (typeof profile.is_premium === "boolean") {
-      payload.is_premium = profile.is_premium;
-    }
-    if (profile.premium_expires_at) {
-      payload.premium_expires_at = profile.premium_expires_at;
-    }
-    if (missionsGranted) {
-      payload.missions_xp_granted = missionsGranted;
-    }
+    // is_premium / premium_expires_at NÃO são enviados: só o servidor
+    // (Edge Function com service role) pode alterá-los.
     const { error } = await window.sb.from("profiles").upsert(payload);
     if (error) console.warn("[SISTEMA] Sync error:", error.message);
   } catch {}
@@ -224,7 +247,7 @@ async function loadFromSupabase(userId) {
       avatar:             data.avatar           || null,
       xp:                 data.xp              || 0,
       level:              data.level           || 1,
-      stats:              data.stats           || DEFAULT_PROFILE.stats,
+      stats:              { ...DEFAULT_PROFILE.stats, ...(data.stats || {}) },
       stat_points:        data.stat_points     || 0,
       streak:             data.streak          || 0,
       last_active:        data.last_active     || null,
@@ -233,12 +256,12 @@ async function loadFromSupabase(userId) {
       achievements:       data.achievements    || [],
       inventory_items:    data.inventory_items || ["badge_beginner"],
       quest_log:          data.quest_log       || {},
+      weekly_log:         data.weekly_log      || {},
       premium_gate_shown: data.premium_gate_shown || false,
       is_premium:         isPremium,
       premium_expires_at: data.premium_expires_at || null,
       streak_shields:     data.streak_shields  ?? (isPremium ? SHIELDS_PREMIUM : SHIELDS_FREE),
       shields_month:      data.shields_month   || null,
-      missions_xp_granted: data.missions_xp_granted || {},
     };
   } catch { return null; }
 }
@@ -247,6 +270,20 @@ function pruneQuestLog(questLog) {
   const keys = Object.keys(questLog).sort();
   if (keys.length <= 30) return questLog;
   return Object.fromEntries(keys.slice(-30).map(k => [k, questLog[k]]));
+}
+
+function pruneWeeklyLog(weeklyLog) {
+  const keys = Object.keys(weeklyLog).sort();
+  if (keys.length <= 26) return weeklyLog;
+  return Object.fromEntries(keys.slice(-26).map(k => [k, weeklyLog[k]]));
+}
+
+// Pipeline único de carga de perfil (local ou remoto): reset mensal de
+// escudos, escudo de streak e nível recalculado a partir do XP.
+function hydrateLoadedProfile(raw) {
+  const p1 = resetShieldsIfNewMonth(raw);
+  const { profile: p2, shieldUsed } = checkStreakShield(p1);
+  return { profile: { ...p2, level: computeLevel(p2.xp || 0).level }, shieldUsed };
 }
 
 // ── Freemium helpers ─────────────────────────────────────────────
@@ -292,11 +329,4 @@ function checkStreakShield(profile) {
     };
   }
   return { profile: { ...profile, streak: 0 }, shieldUsed: false };
-}
-
-function currentWeekKey() {
-  const d   = new Date();
-  const day = d.getDay() || 7;
-  d.setDate(d.getDate() - (day - 1));
-  return d.toISOString().slice(0, 10);
 }

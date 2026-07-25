@@ -1,0 +1,4 @@
+# não publicar o código do backend nem arquivos de infraestrutura
+supabase/
+.claude/
+README.md

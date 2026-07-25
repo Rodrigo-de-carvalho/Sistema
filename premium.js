@@ -1,19 +1,25 @@
 // ── premium.js — Modal de upgrade Premium + Mercado Pago ──────────
 
 // ── Mercado Pago helpers (via Supabase Edge Function) ─────────────
+// A ativação do premium é feita exclusivamente pelo servidor: a Edge
+// Function verifica o pagamento na API do MP (external_reference = user id)
+// e grava is_premium com service role. O cliente só pede a verificação.
 
-const MP_EDGE_URL = 'https://pkewogelkjuvqvmhytwr.supabase.co/functions/v1/mp-checkout';
+const MP_EDGE_URL = `${SUPABASE_URL}/functions/v1/mp-checkout`;
 
-async function createMercadoPagoPreference(userEmail) {
-  const returnUrl = window.location.origin + window.location.pathname + '?payment_status=approved';
+async function createMercadoPagoPreference() {
+  const { data: { session } } = await window.sb.auth.getSession();
+  if (!session) throw new Error('Você precisa estar logado para assinar.');
+
+  const returnUrl = window.location.origin + window.location.pathname;
   const response = await fetch(MP_EDGE_URL, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
       'apikey':        SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ email: userEmail, returnUrl }),
+    body: JSON.stringify({ returnUrl }),
   });
 
   const data = await response.json();
@@ -23,15 +29,19 @@ async function createMercadoPagoPreference(userEmail) {
   return data.checkout_url || data.init_point;
 }
 
-async function activatePremiumInSupabase(userId) {
-  if (!window.sb || !userId) return false;
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { error } = await window.sb.from("profiles").update({
-    is_premium:         true,
-    premium_expires_at: expiresAt,
-    streak_shields:     SHIELDS_PREMIUM,
-  }).eq("id", userId);
-  return !error;
+async function verifyPaymentAndActivate(paymentId) {
+  const { data: { session } } = await window.sb.auth.getSession();
+  if (!session) return { approved: false, error: 'Sessão expirada. Faça login novamente.' };
+
+  const response = await fetch(`${MP_EDGE_URL}?payment_id=${encodeURIComponent(paymentId)}`, {
+    headers: {
+      'apikey':        SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) return { approved: false, error: data.error || `Erro ${response.status} ao verificar pagamento` };
+  return data;
 }
 
 // ── PremiumModal ──────────────────────────────────────────────────
@@ -55,23 +65,24 @@ function PremiumModal({ profile, questLog, userId, userEmail, onClose, onPremium
 
   React.useEffect(() => {
     if (!pendingPaymentId) return;
-    handleActivatePremium();
+    handleActivatePremium(pendingPaymentId);
   }, [pendingPaymentId]);
 
-  const handleActivatePremium = async () => {
+  const handleActivatePremium = async (paymentId) => {
     setPayState('verifying');
     setPayError('');
-    const activated = await activatePremiumInSupabase(userId);
-    if (activated) {
+    const result = await verifyPaymentAndActivate(paymentId);
+    if (result.approved) {
       setPayState('success');
       onPremiumActivated?.();
     } else {
       setPayState('error');
-      setPayError('Erro ao ativar premium. Recarregue a página ou contate o suporte.');
+      setPayError(result.error ||
+        `Pagamento ainda não aprovado (status: ${result.status || 'desconhecido'}). Se você já pagou, aguarde alguns instantes e recarregue a página.`);
     }
   };
 
-  const handleSubscribe = async (userEmail) => {
+  const handleSubscribe = async () => {
     if (!userId) {
       setPayError('Você precisa estar logado para assinar. Faça login e tente novamente.');
       return;
@@ -79,7 +90,7 @@ function PremiumModal({ profile, questLog, userId, userEmail, onClose, onPremium
     setPayState('loading');
     setPayError('');
     try {
-      const checkoutUrl = await createMercadoPagoPreference(userEmail);
+      const checkoutUrl = await createMercadoPagoPreference();
       if (!checkoutUrl) throw new Error('Edge Function não retornou URL de pagamento. Verifique se a função está deployada.');
       window.location.href = checkoutUrl;
     } catch (err) {
@@ -333,7 +344,7 @@ function PremiumModal({ profile, questLog, userId, userEmail, onClose, onPremium
               </div>
 
               <button
-                onClick={() => handleSubscribe(userEmail)}
+                onClick={handleSubscribe}
                 disabled={payState === 'loading'}
                 style={{ width:"100%", maxWidth:400, padding:"14px 0", borderRadius:6,
                   background:"linear-gradient(90deg,rgba(255,215,0,0.2),rgba(155,93,229,0.2),rgba(255,215,0,0.2))",

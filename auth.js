@@ -53,7 +53,10 @@ function AuthScreen({ onAuth }) {
         }
         onAuth(data.session, false);
       } else {
-        const { data, error } = await window.sb.auth.signUp({ email, password });
+        const { data, error } = await window.sb.auth.signUp({
+          email, password,
+          options: { emailRedirectTo: window.location.origin },
+        });
         if (error) { setError(error.message); setLoading(false); return; }
         if (data.session) {
           onAuth(data.session, true);
@@ -242,10 +245,7 @@ function ProfileSetup({ onSave, session }) {
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 800000) { alert("Imagem muito grande. Use menos de 800KB."); return; }
-    const reader = new FileReader();
-    reader.onload = ev => setAvatar(ev.target.result);
-    reader.readAsDataURL(file);
+    processAvatarFile(file, (dataUrl) => { if (dataUrl) setAvatar(dataUrl); });
   };
 
   const handleSave = () => {
@@ -419,32 +419,3 @@ function PasswordResetModal({ onClose }) {
   );
 }
 
-// ── PremiumGate (legado — substituído por PremiumModal) ───────────
-function PremiumGate({ onClose }) {
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:500,
-      display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
-      <div style={{ background:"rgba(7,7,20,0.98)", border:"1px solid rgba(255,215,0,0.3)",
-        borderRadius:8, padding:36, maxWidth:420, width:"90%", textAlign:"center",
-        animation:"badge-unlock 0.4s ease" }}>
-        <div style={{ fontSize:40, marginBottom:16, animation:"streak-flame 2s ease infinite" }}>⚜</div>
-        <div style={{ fontFamily:"var(--font-title)", fontSize:18, fontWeight:700,
-          color:"var(--gold-core)", letterSpacing:2, marginBottom:8 }}>RANKS B, A e S</div>
-        <div style={{ color:"var(--text-dim)", fontSize:10, letterSpacing:3,
-          fontFamily:"var(--font-mono)", marginBottom:20 }}>CONTEÚDO PREMIUM</div>
-        <div style={{ color:"var(--text-mid)", fontSize:13, fontFamily:"var(--font-body)",
-          lineHeight:1.7, marginBottom:28 }}>
-          Você alcançou o limite do plano gratuito.<br/>
-          Os Ranks <strong style={{color:"var(--purple-glow)"}}>B</strong>,{" "}
-          <strong style={{color:"var(--gold-core)"}}>A</strong> e{" "}
-          <strong style={{color:"#ff66dd"}}>S</strong> desbloqueiam missões avançadas,
-          habilidades exclusivas e recompensas especiais.
-        </div>
-        <button onClick={onClose} style={{ padding:"10px 32px", borderRadius:4,
-          border:"1px solid var(--border-dim)", background:"transparent",
-          color:"var(--text-dim)", fontFamily:"var(--font-title)", fontSize:11,
-          letterSpacing:2, cursor:"pointer" }}>CONTINUAR NO RANK C</button>
-      </div>
-    </div>
-  );
-}

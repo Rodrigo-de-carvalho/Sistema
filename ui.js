@@ -10,6 +10,50 @@ function useIsMobile() {
   return mobile;
 }
 
+// Relógio isolado: atualiza a cada segundo sem re-renderizar o app inteiro
+function Clock() {
+  const [time, setTime] = React.useState(() => new Date().toTimeString().slice(0, 8));
+  React.useEffect(() => {
+    const iv = setInterval(() => setTime(new Date().toTimeString().slice(0, 8)), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  return (
+    <div style={{ color:"var(--text-dim)", fontSize:11, fontFamily:"var(--font-mono)" }}>{time}</div>
+  );
+}
+
+// Contagem regressiva até a meia-noite, também isolada
+function Countdown() {
+  const [left, setLeft] = React.useState(getTimeToMidnight);
+  React.useEffect(() => {
+    const iv = setInterval(() => setLeft(getTimeToMidnight()), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  return <span>{left}</span>;
+}
+
+// Redimensiona a imagem do avatar para no máx. 256px em JPEG, evitando
+// sincronizar centenas de KB de base64 com o banco a cada atualização.
+function processAvatarFile(file, cb) {
+  if (!file.type || !file.type.startsWith("image/")) { cb(null); return; }
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    try {
+      const max    = 256;
+      const scale  = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width  = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      cb(canvas.toDataURL("image/jpeg", 0.85));
+    } catch { cb(null); }
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); cb(null); };
+  img.src = url;
+}
+
 const ICON_PATHS = {
   "edit":             "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
   "ghost":            "M9 2a7 7 0 0 0-7 7v8l3-3 2 2 2-2 2 2 2-2 3 3V9a7 7 0 0 0-7-7zm-2 9a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm4 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z",
@@ -157,7 +201,7 @@ function Avatar({ profile, size = 64, editable = false, onEdit }) {
   const initials = (profile.name || "C").slice(0, 2).toUpperCase();
   const inputRef = React.useRef();
   return (
-    <div style={{ position:"relative", width:size, height:size, flexShrink:0 }}
+    <div
       onClick={editable ? () => inputRef.current?.click() : undefined}
       style={{ position:"relative", width:size, height:size, flexShrink:0, cursor: editable?"pointer":"default" }}>
       {profile.avatar

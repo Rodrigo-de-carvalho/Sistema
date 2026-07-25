@@ -1,7 +1,7 @@
 // ── tabs.js — as 5 abas do app ────────────────────────────────────
 
 // ── STATUS ────────────────────────────────────────────────────────
-function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgress, countdown, isPremium, xpLost, onShowPremium, onNameEdit }) {
+function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgress, isPremium, xpLost, onShowPremium, onNameEdit }) {
   const isMobile = useIsMobile();
   const [editingName, setEditingName] = React.useState(false);
   const [nameInput,   setNameInput]   = React.useState(profile.name);
@@ -16,10 +16,10 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
 
   const statValues = STAT_META.map(s => ({ ...s, value: profile.stats[s.key] || 10, max: 100 }));
 
-  // Últimos 7 dias como pontos de dot
+  // Últimos 7 dias como pontos de dot (só conta tarefas realmente feitas)
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10);
-    const hasActivity = Object.keys(questLog[date] || {}).length > 0;
+    const hasActivity = Object.values(questLog[date] || {}).some(q => Object.values(q).some(_taskDone));
     return { date, active: hasActivity };
   });
 
@@ -143,7 +143,7 @@ function StatusTab({ profile, questLog, onAvatarEdit, onStatPoint, weeklyProgres
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
             <div style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
-              últimos 7 dias · reset em {countdown}
+              últimos 7 dias · reset em <Countdown />
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
               {Array.from({ length: isPremium ? SHIELDS_PREMIUM : SHIELDS_FREE }).map((_, i) => (
@@ -493,7 +493,7 @@ function SkillsTab({ profile }) {
 }
 
 // ── MISSÕES ───────────────────────────────────────────────────────
-function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium, quests, currentRank }) {
+function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremium, onShowPremium, quests, currentRank }) {
   const [filter, setFilter] = React.useState("Todas");
   const today    = todayKey();
   const list     = quests || DAILY_QUESTS;
@@ -531,7 +531,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
         <div style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(255,68,102,0.08)",
           border:"1px solid rgba(255,68,102,0.2)", borderRadius:4, padding:"6px 12px", flexShrink:0 }}>
           <Icon name="clock" size={12} color="var(--red-core)" />
-          <span style={{ color:"var(--red-core)", fontSize:12, fontFamily:"var(--font-mono)" }}>Reset: {countdown}</span>
+          <span style={{ color:"var(--red-core)", fontSize:12, fontFamily:"var(--font-mono)" }}>Reset: <Countdown /></span>
         </div>
       </div>
 
@@ -540,7 +540,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
           const tc       = catColors[q.category] || "var(--text-mid)";
           const dayLog   = questLog[today] || {};
           const qLog     = dayLog[q.id] || {};
-          const done     = q.tasks.filter(t => qLog[t.id]).length;
+          const done     = q.tasks.filter(t => _taskDone(qLog[t.id])).length;
           const total    = q.tasks.length;
           const pct      = Math.round((done / total) * 100);
           const complete = done === total;
@@ -576,7 +576,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
               {/* Tarefas */}
               <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
                 {q.tasks.map(t => {
-                  const isDone = !!qLog[t.id];
+                  const isDone = _taskDone(qLog[t.id]);
                   return (
                     <div key={t.id} onClick={() => onTaskToggle(q.id, t.id, t.xp, t.stat)}
                       style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer",
@@ -662,10 +662,16 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
           </div>
         )}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
-          {WEEKLY_QUESTS.map(q => (
+          {WEEKLY_QUESTS.map(q => {
+            const week      = currentWeekKey();
+            const wkLog     = ((weeklyLog || {})[week] || {})[q.id] || {};
+            const wkDone    = q.tasks.filter(t => _taskDone(wkLog[t.id])).length;
+            const wkTotal   = q.tasks.length;
+            const wkComplete= wkDone === wkTotal;
+            return (
             <div key={q.id} style={{ borderRadius:6, overflow:"hidden",
-              background:"rgba(10,10,26,0.6)",
-              border: isPremium ? "1px solid rgba(155,93,229,0.2)" : "1px solid rgba(155,93,229,0.25)" }}>
+              background: wkComplete ? "rgba(0,255,136,0.03)" : "rgba(10,10,26,0.6)",
+              border: wkComplete ? "1px solid rgba(0,255,136,0.25)" : "1px solid rgba(155,93,229,0.25)" }}>
               <div style={{ padding:16 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                   <div>
@@ -677,6 +683,12 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
                         <span style={{ background:"rgba(255,215,0,0.1)", border:"1px solid rgba(255,215,0,0.3)",
                           color:"var(--gold-core)", fontSize:9, padding:"2px 6px", fontFamily:"var(--font-title)", borderRadius:2 }}>
                           ⚜ PREMIUM
+                        </span>
+                      )}
+                      {isPremium && wkComplete && (
+                        <span style={{ background:"rgba(0,255,136,0.1)", border:"1px solid rgba(0,255,136,0.3)",
+                          color:"var(--green-core)", fontSize:9, padding:"2px 6px", fontFamily:"var(--font-title)", borderRadius:2 }}>
+                          ✓ COMPLETA
                         </span>
                       )}
                     </div>
@@ -691,21 +703,42 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
                   </div>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                  {q.tasks.map(t => (
-                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:8,
-                      padding:"6px 10px", borderRadius:4,
-                      background: isPremium ? "rgba(255,255,255,0.02)" : "rgba(155,93,229,0.05)",
-                      border:"1px solid rgba(155,93,229,0.15)",
-                      color: isPremium ? "var(--text-dim)" : "var(--text-mid)", fontSize:11, fontFamily:"var(--font-body)",
-                      cursor: isPremium ? "pointer" : "default" }}>
+                  {q.tasks.map(t => {
+                    const tDone = _taskDone(wkLog[t.id]);
+                    return (
+                    <div key={t.id}
+                      onClick={isPremium ? () => onWeeklyToggle(q.id, t.id, t.xp, t.stat) : undefined}
+                      style={{ display:"flex", alignItems:"center", gap:8,
+                        padding:"6px 10px", borderRadius:4,
+                        background: tDone ? "rgba(0,255,136,0.05)" : (isPremium ? "rgba(255,255,255,0.02)" : "rgba(155,93,229,0.05)"),
+                        border: `1px solid ${tDone ? "rgba(0,255,136,0.2)" : "rgba(155,93,229,0.15)"}`,
+                        color: tDone ? "var(--text-dim)" : (isPremium ? "var(--text-mid)" : "var(--text-mid)"),
+                        fontSize:11, fontFamily:"var(--font-body)",
+                        textDecoration: tDone ? "line-through" : "none",
+                        cursor: isPremium ? "pointer" : "default" }}>
                       <div style={{ width:14, height:14, borderRadius:2, flexShrink:0,
-                        border: isPremium ? "1px solid rgba(155,93,229,0.4)" : "1px solid rgba(155,93,229,0.2)",
-                        background:"transparent" }} />
+                        border: `1px solid ${tDone ? "var(--green-core)" : "rgba(155,93,229,0.4)"}`,
+                        background: tDone ? "rgba(0,255,136,0.15)" : "transparent",
+                        display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        {tDone && <Icon name="check" size={9} color="var(--green-core)" />}
+                      </div>
                       <span style={{ flex:1 }}>{t.label}</span>
                       <span style={{ color:"var(--purple-glow)", fontSize:10, fontFamily:"var(--font-mono)", flexShrink:0 }}>+{t.xp} XP</span>
                     </div>
-                  ))}
+                  );})}
                 </div>
+                {isPremium && (
+                  <div style={{ marginTop:10 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                      <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:1 }}>SEMANA ATUAL</span>
+                      <span style={{ color: wkComplete?"var(--green-core)":"var(--text-mid)", fontSize:9, fontFamily:"var(--font-mono)" }}>{wkDone}/{wkTotal}</span>
+                    </div>
+                    <div style={{ height:4, background:"rgba(255,255,255,0.05)", borderRadius:2, overflow:"hidden" }}>
+                      <div style={{ height:"100%", width:`${Math.round((wkDone/wkTotal)*100)}%`,
+                        background: wkComplete?"var(--green-core)":"var(--purple-core)", borderRadius:2, transition:"width 0.5s" }} />
+                    </div>
+                  </div>
+                )}
                 {/* CTA inline para free */}
                 {!isPremium && (
                   <div onClick={onShowPremium} style={{ marginTop:12, padding:"8px 12px", borderRadius:4, cursor:"pointer",
@@ -719,7 +752,7 @@ function QuestsTab({ questLog, onTaskToggle, countdown, isPremium, onShowPremium
                 )}
               </div>
             </div>
-          ))}
+          );})}
         </div>
       </div>
     </div>
@@ -865,7 +898,7 @@ function AchievementsTab({ profile }) {
         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
           <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)", letterSpacing:1 }}>PROGRESSO TOTAL</span>
           <span style={{ color:"var(--gold-core)", fontSize:9, fontFamily:"var(--font-mono)" }}>
-            {Math.round((unlocked.size/ACHIEVEMENTS.length)*100)}%
+            {Math.round((unlocked.size/ALL_ACHIEVEMENTS.length)*100)}%
           </span>
         </div>
         <Bar value={unlocked.size} max={ALL_ACHIEVEMENTS.length} color="var(--gold-core)" />

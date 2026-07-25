@@ -29,7 +29,7 @@ async function sbGetGuildMembers(guildId) {
     .eq("guild_id", guildId);
   if (!members || !members.length) return [];
   const ids = members.map(m => m.user_id);
-  const { data: profiles } = await window.sb.from("profiles")
+  const { data: profiles } = await window.sb.from("public_profiles")
     .select("id,name,level,xp,streak")
     .in("id", ids);
   const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
@@ -46,25 +46,35 @@ async function sbSearchGuilds(query) {
 }
 
 async function sbGetTopGuilds() {
+  // 3 queries no total, em vez de 1 + 2 por guilda (N+1)
   if (!window.sb) return [];
   const { data: guilds } = await window.sb.from("guilds")
     .select("id,name,description")
     .limit(30);
   if (!guilds || !guilds.length) return [];
-  const results = await Promise.all(guilds.map(async g => {
-    const { data: members } = await window.sb.from("guild_members")
-      .select("user_id")
-      .eq("guild_id", g.id);
-    const ids = (members || []).map(m => m.user_id);
-    let totalXP = 0;
-    if (ids.length) {
-      const { data: profs } = await window.sb.from("profiles")
-        .select("xp")
-        .in("id", ids);
-      totalXP = (profs || []).reduce((s, p) => s + (p.xp || 0), 0);
-    }
-    return { ...g, memberCount: ids.length, totalXP };
-  }));
+
+  const guildIds = guilds.map(g => g.id);
+  const { data: members } = await window.sb.from("guild_members")
+    .select("guild_id,user_id")
+    .in("guild_id", guildIds);
+
+  const userIds = [...new Set((members || []).map(m => m.user_id))];
+  let xpMap = {};
+  if (userIds.length) {
+    const { data: profs } = await window.sb.from("public_profiles")
+      .select("id,xp")
+      .in("id", userIds);
+    xpMap = Object.fromEntries((profs || []).map(p => [p.id, p.xp || 0]));
+  }
+
+  const results = guilds.map(g => {
+    const gm = (members || []).filter(m => m.guild_id === g.id);
+    return {
+      ...g,
+      memberCount: gm.length,
+      totalXP: gm.reduce((s, m) => s + (xpMap[m.user_id] || 0), 0),
+    };
+  });
   return results.sort((a, b) => b.totalXP - a.totalXP);
 }
 
