@@ -504,9 +504,16 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
 
   const handleVerified = () => {
     if (!verify) return;
+    markTaskVerified(verify.quest.id, verify.task.id);
     const dayLog = questLog[today] || {};
     const alreadyDone = _taskDone((dayLog[verify.quest.id] || {})[verify.task.id]);
-    if (!alreadyDone) onTaskToggle(verify.quest.id, verify.task.id, verify.task.xp, verify.task.stat);
+    if (!alreadyDone) {
+      onTaskToggle(verify.quest.id, verify.task.id, verify.task.xp, verify.task.stat, true);
+    } else {
+      // estava marcada manualmente (meio XP): promove para XP cheio
+      onTaskToggle(verify.quest.id, verify.task.id, verify.task.xp, verify.task.stat);
+      onTaskToggle(verify.quest.id, verify.task.id, verify.task.xp, verify.task.stat, true);
+    }
   };
 
   return (
@@ -554,6 +561,9 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
             fontSize:9, padding:"3px 10px",
             fontFamily:"var(--font-title)", letterSpacing:1.5, borderRadius:2,
           }}>MISSÕES RANK {currentRank} — escaladas para seu nível atual</span>
+          <span style={{ color:"var(--text-dim)", fontSize:9, fontFamily:"var(--font-mono)" }}>
+            * sem comprovação (📷/⏱/🏃) vale metade do XP
+          </span>
         </div>
       )}
       {/* Header com filtros + timer */}
@@ -617,7 +627,10 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
               {/* Tarefas */}
               <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
                 {q.tasks.map(t => {
-                  const isDone = _taskDone(qLog[t.id]);
+                  const isDone     = _taskDone(qLog[t.id]);
+                  const verifiable = isVerifiableTask(t.id);
+                  const proven     = verifiable && isTaskVerified(q.id, t.id);
+                  const shownXP    = (!verifiable || proven) ? t.xp : Math.round(t.xp / 2);
                   return (
                     <div key={t.id} onClick={() => onTaskToggle(q.id, t.id, t.xp, t.stat)}
                       style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer",
@@ -636,9 +649,16 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
                       <span style={{ flex:1, color: isDone?"var(--text-dim)":"var(--text-mid)", fontSize:12,
                         fontFamily:"var(--font-body)", textDecoration: isDone?"line-through":"none" }}>
                         {t.label}
+                        {proven && (
+                          <span style={{ marginLeft:6, background:"rgba(0,255,136,0.1)",
+                            border:"1px solid rgba(0,255,136,0.35)", color:"var(--green-core)",
+                            fontSize:8, padding:"1px 6px", borderRadius:2,
+                            fontFamily:"var(--font-title)", letterSpacing:1,
+                            textDecoration:"none", display:"inline-block" }}>✓ COMPROVADA</span>
+                        )}
                       </span>
                       <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                        {!isDone && CAMERA_TASKS[t.id] && (
+                        {!isDone && !proven && CAMERA_TASKS[t.id] && (
                           <button title="Verificar com a câmera (IA conta as repetições)"
                             onClick={e => { e.stopPropagation();
                               setVerify({ type:"camera", quest:q, task:t, target: parseRepTarget(t.label) }); }}
@@ -648,7 +668,7 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
                             📷 IA
                           </button>
                         )}
-                        {!isDone && STRAVA_TASKS[t.id] && (
+                        {!isDone && !proven && STRAVA_TASKS[t.id] && (
                           <button title="Verificar com o GPS do Strava"
                             onClick={e => { e.stopPropagation();
                               setVerify({ type:"strava", quest:q, task:t, target: parseKmTarget(t.label) }); }}
@@ -658,7 +678,7 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
                             🏃 GPS
                           </button>
                         )}
-                        {!isDone && TIMER_TASKS[t.id] && (
+                        {!isDone && !proven && TIMER_TASKS[t.id] && (
                           <button title="Rodar timer — a tarefa marca sozinha ao terminar"
                             onClick={e => { e.stopPropagation();
                               setVerify({ type:"timer", quest:q, task:t, target: parseMinutesTarget(t.label) }); }}
@@ -671,7 +691,10 @@ function QuestsTab({ questLog, onTaskToggle, weeklyLog, onWeeklyToggle, isPremiu
                               ? `⏱ ${formatTimerSec(taskTimer.remainingSec)}` : "⏱ TIMER"}
                           </button>
                         )}
-                        <span style={{ color:"var(--purple-glow)", fontSize:10, fontFamily:"var(--font-mono)" }}>+{t.xp} XP</span>
+                        <span title={verifiable && !proven ? `Comprove (📷/⏱/🏃) para ganhar +${t.xp} XP` : undefined}
+                          style={{ color:"var(--purple-glow)", fontSize:10, fontFamily:"var(--font-mono)" }}>
+                          +{shownXP} XP{verifiable && !proven ? "*" : ""}
+                        </span>
                         <span style={{ color: STAT_META.find(s=>s.key===t.stat)?.color||"var(--text-dim)",
                           fontSize:10, fontFamily:"var(--font-mono)" }}>{t.stat}+1</span>
                       </div>

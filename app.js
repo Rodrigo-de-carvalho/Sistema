@@ -230,7 +230,9 @@ function App() {
   // Modelo simétrico: marcar concede XP/ouro/atributo; desmarcar devolve
   // exatamente o que foi concedido (número gravado no log). Completar a
   // missão inteira concede o bônus + ouro da missão; desfazer remove.
-  const handleTaskToggle = useCallback((questId, taskId, taskXP, taskStat) => {
+  // Tarefa verificável marcada SEM comprovação (timer/câmera/GPS) vale
+  // metade do XP; comprovada no dia vale o XP cheio.
+  const handleTaskToggle = useCallback((questId, taskId, taskXP, taskStat, verified) => {
     const day  = todayKey();
     const yest = yesterdayKey();
     const ql   = questLogRef.current;
@@ -240,7 +242,9 @@ function App() {
     const storedXP = typeof rawVal === "number" ? rawVal : 0;
 
     const quest   = (dailyQuests || DAILY_QUESTS).find(q => q.id === questId);
-    const grantXP = profile?.is_premium ? Math.round(taskXP * (1 + PREMIUM_XP_BONUS)) : taskXP;
+    const proven  = verified || isTaskVerified(questId, taskId);
+    const baseXP  = (!isVerifiableTask(taskId) || proven) ? taskXP : Math.round(taskXP / 2);
+    const grantXP = profile?.is_premium ? Math.round(baseXP * (1 + PREMIUM_XP_BONUS)) : baseXP;
 
     const newTaskVal = isDone ? false : grantXP;
     const newDayLog  = { ...(ql[day] || {}), [questId]: { ...((ql[day]?.[questId]) || {}), [taskId]: newTaskVal } };
@@ -261,7 +265,8 @@ function App() {
       const newXP     = Math.max(0, prev.xp + xpDelta);
       const newLevel  = computeLevel(newXP).level;
       const statDelta = isDone ? (storedXP > 0 ? -1 : 0) : 1;
-      const goldDelta = (isDone ? (storedXP > 0 ? -Math.floor(taskXP / 5) : 0) : Math.floor(taskXP / 5)) + bonusGoldDelta;
+      // ouro proporcional ao XP realmente concedido — simétrico no desmarque
+      const goldDelta = (isDone ? (storedXP > 0 ? -Math.floor(storedXP / 5) : 0) : Math.floor(grantXP / 5)) + bonusGoldDelta;
 
       let newStreak = prev.streak, newLastActive = prev.last_active;
       if (!isDone && prev.last_active !== day) {
@@ -313,7 +318,7 @@ function App() {
       const newXP     = Math.max(0, prev.xp + xpDelta);
       const newLevel  = computeLevel(newXP).level;
       const statDelta = isDone ? (storedXP > 0 ? -1 : 0) : 1;
-      const goldDelta = (isDone ? (storedXP > 0 ? -Math.floor(taskXP / 5) : 0) : Math.floor(taskXP / 5)) + bonusGold;
+      const goldDelta = (isDone ? (storedXP > 0 ? -Math.floor(storedXP / 5) : 0) : Math.floor(grantXP / 5)) + bonusGold;
 
       return {
         ...prev,
@@ -332,10 +337,17 @@ function App() {
 
   // ── Timer de tarefa (marca sozinha quando o tempo termina) ───
   const handleTimerComplete = useCallback((t) => {
+    markTaskVerified(t.questId, t.taskId);
     const ql   = questLogRef.current;
     const done = _taskDone((ql[todayKey()]?.[t.questId] || {})[t.taskId]);
-    if (!done) handleTaskToggle(t.questId, t.taskId, t.taskXP, t.taskStat);
-    addAlert("⏱ Tempo cumprido!", `${t.label} — tarefa concluída.`, "success");
+    if (!done) {
+      handleTaskToggle(t.questId, t.taskId, t.taskXP, t.taskStat, true);
+    } else {
+      // já estava marcada manualmente (meio XP): promove para XP cheio
+      handleTaskToggle(t.questId, t.taskId, t.taskXP, t.taskStat);
+      handleTaskToggle(t.questId, t.taskId, t.taskXP, t.taskStat, true);
+    }
+    addAlert("⏱ Tempo cumprido!", `${t.label} — comprovada com XP cheio.`, "success");
   }, [handleTaskToggle, addAlert]);
 
   const taskTimer = useTaskTimer(handleTimerComplete);

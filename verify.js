@@ -32,28 +32,44 @@ function formatTimerSec(s) {
   return (h ? `${h}:${String(m).padStart(2, "0")}` : String(m)) + ":" + String(sec).padStart(2, "0");
 }
 
-// ── Timer de tarefa (persiste no localStorage; 1 por vez) ─────────
-
-const LS_TIMER_KEY = "sistema_task_timer";
-
-function loadTaskTimer() {
-  try {
-    const t = JSON.parse(localStorage.getItem(LS_TIMER_KEY));
-    return t && t.endsAt ? t : null;
-  } catch { return null; }
+// Uma tarefa é "verificável" se tem algum método de comprovação.
+// Marcar manualmente uma tarefa verificável SEM comprovar dá metade do XP.
+function isVerifiableTask(taskId) {
+  return !!(CAMERA_TASKS[taskId] || STRAVA_TASKS[taskId] || TIMER_TASKS[taskId]);
 }
-function saveTaskTimer(t) {
+
+// ── Registro de tarefas comprovadas hoje (por aparelho) ───────────
+// Depois de comprovada (timer/câmera/GPS), a prova vale o dia inteiro:
+// desmarcar e remarcar mantém o XP cheio e os botões de verificação somem.
+
+const LS_VERIFIED_KEY = "sistema_verified_tasks";
+
+function _loadVerifiedTasks() {
   try {
-    if (t) localStorage.setItem(LS_TIMER_KEY, JSON.stringify(t));
-    else   localStorage.removeItem(LS_TIMER_KEY);
+    const v = JSON.parse(localStorage.getItem(LS_VERIFIED_KEY));
+    if (v && v.date === todayKey()) return v.tasks || {};
+  } catch {}
+  return {};
+}
+
+function markTaskVerified(questId, taskId) {
+  try {
+    const tasks = _loadVerifiedTasks();
+    tasks[`${questId}/${taskId}`] = true;
+    localStorage.setItem(LS_VERIFIED_KEY, JSON.stringify({ date: todayKey(), tasks }));
   } catch {}
 }
 
-// Hook usado no App: mantém o timer vivo mesmo trocando de aba,
-// recarregando a página ou fechando o navegador (baseado em relógio
-// de parede). Ao completar, chama onComplete(timer) — que marca a task.
+function isTaskVerified(questId, taskId) {
+  return !!_loadVerifiedTasks()[`${questId}/${taskId}`];
+}
+
+// ── Timer de tarefa (em memória; 1 por vez) ───────────────────────
+// Regra: o timer só vale com o app aberto. Trocar de aba ou minimizar
+// tudo bem (é relógio de parede), mas RECARREGAR ou FECHAR a página
+// perde o timer — sair antes do fim não conta.
 function useTaskTimer(onComplete) {
-  const [active, setActive] = React.useState(loadTaskTimer);
+  const [active, setActive] = React.useState(null);
   const [, setTick] = React.useState(0);
   const onCompleteRef = React.useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -66,27 +82,22 @@ function useTaskTimer(onComplete) {
 
   React.useEffect(() => {
     if (!active) return;
-    if (active.date !== todayKey()) {              // timer de outro dia: descarta
-      setActive(null); saveTaskTimer(null);
-      return;
-    }
     if (Date.now() >= active.endsAt) {
       const t = active;
-      setActive(null); saveTaskTimer(null);
+      setActive(null);
       onCompleteRef.current(t);
     }
   });
 
   const start = React.useCallback((quest, task, minutes) => {
-    const t = {
+    setActive({
       questId: quest.id, taskId: task.id, taskXP: task.xp, taskStat: task.stat,
-      label: task.label, totalMin: minutes, date: todayKey(),
+      label: task.label, totalMin: minutes,
       startedAt: Date.now(), endsAt: Date.now() + minutes * 60000,
-    };
-    setActive(t); saveTaskTimer(t);
+    });
   }, []);
 
-  const cancel = React.useCallback(() => { setActive(null); saveTaskTimer(null); }, []);
+  const cancel = React.useCallback(() => { setActive(null); }, []);
 
   const remainingSec = active ? Math.max(0, Math.ceil((active.endsAt - Date.now()) / 1000)) : 0;
   return { active, remainingSec, start, cancel };
@@ -98,16 +109,24 @@ function TimerModal({ quest, task, minutes, timer, onClose }) {
   const isMine      = !!(timer.active && timer.active.questId === quest.id && timer.active.taskId === task.id);
   const otherActive = !!(timer.active && !isMine);
   const wasMineRef  = React.useRef(false);
+  const [cancelled, setCancelled] = React.useState(false);
   if (isMine) wasMineRef.current = true;
+  // "finalizado" só quando o timer TERMINOU sozinho — cancelar não conta
   const finished = wasMineRef.current && !timer.active;
+
+  const handleCancel = () => {
+    setCancelled(true);
+    wasMineRef.current = false;
+    timer.cancel();
+  };
 
   const totalSec = (isMine ? timer.active.totalMin : minutes) * 60;
   const remSec   = isMine ? timer.remainingSec : totalSec;
   const pct      = finished ? 100 : isMine ? Math.min(100, Math.round(((totalSec - remSec) / totalSec) * 100)) : 0;
 
   const hint = task.id === "no_phone"
-    ? "Aperte iniciar, larga o celular e vai viver 😉 — quando o tempo acabar, a tarefa marca sozinha."
-    : "Pode minimizar ou trocar de aba: o timer continua contando e a tarefa marca sozinha no fim.";
+    ? "Aperte iniciar, larga o celular e vai viver 😉 — quando o tempo acabar, a tarefa marca sozinha com XP cheio."
+    : "Pode minimizar ou trocar de aba — mas recarregar/sair da página ou cancelar perde o timer e NÃO conta.";
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.9)", zIndex:8000,
@@ -149,6 +168,14 @@ function TimerModal({ quest, task, minutes, timer, onClose }) {
               </div>
             )}
 
+            {cancelled && !timer.active && (
+              <div style={{ background:"rgba(255,68,102,0.08)", border:"1px solid rgba(255,68,102,0.3)",
+                borderRadius:6, padding:"8px 12px", marginBottom:12, fontSize:11,
+                color:"var(--red-core)" }}>
+                Timer cancelado — não conta como comprovação.
+              </div>
+            )}
+
             {!isMine && !otherActive && (
               <button onClick={() => timer.start(quest, task, minutes)}
                 style={{ width:"100%", padding:"13px 0", borderRadius:6,
@@ -160,7 +187,7 @@ function TimerModal({ quest, task, minutes, timer, onClose }) {
             )}
 
             {(isMine || otherActive) && (
-              <button onClick={timer.cancel}
+              <button onClick={handleCancel}
                 style={{ width:"100%", padding:"11px 0", borderRadius:6,
                   background:"rgba(255,68,102,0.08)", border:"1px solid rgba(255,68,102,0.35)",
                   color:"var(--red-core)", fontFamily:"var(--font-title)", fontSize:11,
